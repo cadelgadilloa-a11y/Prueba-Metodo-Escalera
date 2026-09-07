@@ -1,0 +1,307 @@
+
+:root{
+  --bg: #12151C;
+  --surface: #1B2029;
+  --surface-2: #232937;
+  --paper: #F3EFE4;
+  --ink: #23211C;
+  --ink-soft: #55503f;
+  --text: #E9E7DF;
+  --muted: #939AAC;
+  --red: #B23A3A;
+  --red-soft: #7a2b2b;
+  --green: #4C8C6B;
+  --gold: #C9A227;
+  --line: #2E3542;
+  --font-display: "Source Serif 4", Georgia, serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --radius: 3px;
+}
+
+*{ box-sizing: border-box; }
+html{ -webkit-font-smoothing: antialiased; }
+
+body{
+  margin:0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  line-height: 1.5;
+}
+
+button{ font-family: inherit; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation: none !important; transition: none !important; }
+}
+
+/* ============ MASTHEAD ============ */
+.masthead{
+  border-bottom: 1px solid var(--line);
+  padding: 3rem 1.5rem 2.25rem;
+}
+.masthead__inner{
+  max-width: 920px;
+  margin: 0 auto;
+}
+.masthead__kicker{
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  margin: 0 0 0.9rem;
+}
+.masthead__title{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1.8rem, 4.5vw, 2.9rem);
+  line-height: 1.1;
+  margin: 0 0 0.85rem;
+  max-width: 16ch;
+}
+.masthead__subtitle{
+  font-size: 1.02rem;
+  color: var(--muted);
+  max-width: 62ch;
+  margin: 0;
+}
+
+/* ============ LAYOUT ============ */
+.layout{
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+}
+
+/* ============ WRITING AREA ============ */
+/* grid 2 cols: page (1fr) + sidebar (280px fija) */
+.writing{
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.75rem;
+  align-items: start;
+}
+
+.page{
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 2px;
+  padding: 1.9rem 1.9rem 1.1rem;
+  box-shadow: 0 18px 40px -20px rgba(0,0,0,0.6);
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+}
+
+.page__topbar{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed #cfc7ad;
+}
+.page__topic-label{
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+}
+.page__topic-select, .page__topic-custom{
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #cfc7ad;
+  background: #fbf9f2;
+  color: var(--ink);
+  border-radius: 2px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.page__prompt{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin: 0 0 1.1rem;
+  color: var(--ink);
+}
+
+.page__editor{
+  flex: 1;
+  min-height: 320px;
+  resize: vertical;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  line-height: 1.75;
+  outline: none;
+}
+.page__editor::placeholder{ color: #9a927a; }
+
+.page__footer{
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  padding-top: 0.9rem;
+  margin-top: 0.6rem;
+  border-top: 1px dashed #cfc7ad;
+}
+
+/* ============ SIDEBAR ============ */
+.sidebar{
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  position: sticky;
+  top: 1.5rem;
+}
+.sidebar__block{
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+.sidebar__label{
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+.sidebar__timer{
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 1.8rem;
+  color: var(--text);
+  margin-bottom: 0.7rem;
+}
+.sidebar__timer-controls{
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* width/background: seteados inline por JS */
+.meter{
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+.meter__bar{
+  height: 100%;
+  width: 0%;
+  background: var(--gold);
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.sidebar__hint{
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.sidebar__tips{
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ============ BUTTONS ============ */
+.btn{
+  border-radius: 2px;
+  border: 1px solid transparent;
+  padding: 0.65rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.btn--primary{
+  background: var(--red);
+  color: #fff;
+  width: 100%;
+}
+.btn--primary:hover:not(:disabled){ background: var(--red-soft); }
+.btn--primary:disabled{ opacity: 0.4; cursor: not-allowed; }
+
+.btn--ghost{
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text);
+  flex: 1;
+}
+.btn--ghost:hover:not(:disabled){ border-color: var(--muted); }
+.btn--ghost:disabled{ opacity: 0.4; cursor: not-allowed; }
+
+/* ============ CONFIRMATION ============ */
+/* hidden attr controlado por JS en submitBtn/retryBtn */
+.confirmation{
+  border-top: 1px solid var(--line);
+  padding-top: 2rem;
+}
+.confirmation h2{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.6rem;
+  margin: 0 0 0.8rem;
+}
+.confirmation p{
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+.confirmation strong{ color: var(--text); }
+.confirmation__actions{
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-top: 1.2rem;
+}
+.confirmation__actions .btn{ width: auto; min-width: 200px; }
+
+/* ============ FOOTER ============ */
+.site-footer{
+  border-top: 1px solid var(--line);
+  padding: 1.6rem 1.5rem 2.4rem;
+  text-align: center;
+}
+.site-footer p{
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  max-width: 60ch;
+  margin: 0 auto;
+}
+
+/* ============ RESPONSIVE ============ */
+/* <860px: grid 2 cols -> 1 col, sidebar pasa a row de bloques */
+@media (max-width: 860px){
+  .writing{ grid-template-columns: 1fr; }
+  .sidebar{
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .sidebar__block{ flex: 1 1 220px; }
+  .sidebar__block--tips{ flex-basis: 100%; }
+  #submitBtn{ flex-basis: 100%; }
+}
+
+/* <520px: ajuste de padding para mobile */
+@media (max-width: 520px){
+  .masthead{ padding: 2.2rem 1.1rem 1.8rem; }
+  .layout{ padding: 1.6rem 1.1rem 3rem; }
+  .page{ padding: 1.4rem 1.2rem 0.9rem; }
+  .confirmation__actions .btn{ width: 100%; min-width: 0; }
+}

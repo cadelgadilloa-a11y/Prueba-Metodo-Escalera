@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba de Redacción — Texto tipo Cuartilla</title>
+
+<!-- Fonts: display serif (Source Serif 4) + UI sans/mono (IBM Plex) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Header estático, sin lógica -->
+<header class="masthead">
+  <div class="masthead__inner">
+    <p class="masthead__kicker">Prueba de redacción</p>
+    <h1 class="masthead__title">Prueba de Redacción tipo Cuartilla</h1>
+    <p class="masthead__subtitle">Escribe un artículo corto (una cuartilla, entre 220 y 300 palabras) sobre el tema que elijas o el que te asignen.</p>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- writing: grid de 2 cols (page / sidebar), colapsa a 1 col en mobile -->
+  <section class="writing" aria-labelledby="writing-titulo">
+
+    <div class="writing__page">
+      <div class="page">
+
+        <!-- topicSelect + customTopic controlados en script.js (evento change/input) -->
+        <div class="page__topbar">
+          <label class="page__topic-label" for="topicSelect">Tema del artículo</label>
+          <select id="topicSelect" class="page__topic-select">
+            <option value="">— Elegir un tema —</option>
+            <option value="La inteligencia artificial en la educación superior">La inteligencia artificial en la educación superior</option>
+            <option value="El impacto de las redes sociales en la comunicación juvenil">El impacto de las redes sociales en la comunicación juvenil</option>
+            <option value="Retos éticos de la automatización laboral">Retos éticos de la automatización laboral</option>
+            <option value="La brecha digital en las zonas rurales de Colombia">La brecha digital en las zonas rurales de Colombia</option>
+            <option value="__custom__">Escribir mi propio tema…</option>
+          </select>
+          <!-- hidden por defecto; toggle en JS si topicSelect.value === '__custom__' -->
+          <input type="text" id="customTopic" class="page__topic-custom" placeholder="Escribe el tema aquí" hidden>
+        </div>
+
+        <!-- sincronizado con topicSelect/customTopic -->
+        <h2 id="writing-titulo" class="page__prompt" id="promptDisplay">Elige un tema arriba para comenzar.</h2>
+
+        <!-- spellcheck/autocorrect/autocapitalize/autocomplete off: sin asistencia del navegador -->
+        <textarea id="editor" class="page__editor" placeholder="Empieza a escribir tu artículo aquí. El cronómetro inicia con tu primera palabra…" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
+
+        <!-- recalculado en cada 'input' del editor -->
+        <div class="page__footer">
+          <span id="wordCount">0 palabras</span>
+          <span id="paragraphCount">0 párrafos</span>
+        </div>
+      </div>
+    </div>
+
+    <aside class="sidebar" aria-label="Indicadores en vivo">
+
+      <!-- timer: setInterval de 1000ms, ver startTimer()/togglePause() -->
+      <div class="sidebar__block">
+        <span class="sidebar__label">Tiempo de redacción</span>
+        <span class="sidebar__timer" id="timer">00:00</span>
+        <div class="sidebar__timer-controls">
+          <button id="pauseBtn" class="btn btn--ghost" disabled>Pausar</button>
+          <button id="resetBtn" class="btn btn--ghost">Reiniciar</button>
+        </div>
+      </div>
+
+      <!-- width/background inline via JS según TARGET_MIN/TARGET_MAX -->
+      <div class="sidebar__block">
+        <span class="sidebar__label">Meta de extensión</span>
+        <div class="meter">
+          <div class="meter__bar" id="lengthMeter"></div>
+        </div>
+        <span class="sidebar__hint" id="lengthHint">Objetivo: 220–300 palabras</span>
+      </div>
+
+      <!-- estático -->
+      <div class="sidebar__block sidebar__block--tips">
+        <span class="sidebar__label">Recordatorios</span>
+        <ul class="sidebar__tips">
+          <li>Separa introducción, desarrollo y conclusión en párrafos distintos.</li>
+          <li>Usa conectores para enlazar ideas (sin embargo, además, por lo tanto…).</li>
+          <li>Revisa tu texto antes de entregarlo.</li>
+        </ul>
+      </div>
+
+      <!-- disabled hasta words.length >= 30, ver updateLiveCounters() -->
+      <button id="submitBtn" class="btn btn--primary" disabled>Entregar</button>
+    </aside>
+  </section>
+
+  <!-- hidden hasta submitBtn click; rellenado por el listener de submitBtn -->
+  <section class="confirmation" id="confirmation" hidden aria-labelledby="confirmation-titulo">
+    <h2 id="confirmation-titulo">Texto entregado</h2>
+    <p>Tema: <strong id="confirmTopic"></strong></p>
+    <p>Tiempo de redacción: <strong id="confirmTime"></strong> · <span id="confirmWords"></span> · <span id="confirmParagraphs"></span></p>
+    <div class="confirmation__actions">
+      <!-- genera Blob + <a download> -->
+      <button id="downloadBtn" class="btn btn--primary">Descargar texto (.txt)</button>
+      <button id="retryBtn" class="btn btn--ghost">Escribir otra vez</button>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>Página de captura de textos para la prueba de redacción. No calcula puntajes ni evaluaciones.</p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
