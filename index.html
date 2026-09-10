@@ -14,6 +14,10 @@
 </head>
 <body>
 
+<!-- data-theme en <html> lo controla script.js; toggleTheme() alterna
+     entre 'dark' (valores por defecto en :root) y 'light' ([data-theme="light"]) -->
+<button id="themeToggle" class="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">Modo claro</button>
+
 <!-- Header estático, sin lógica -->
 <header class="masthead">
   <div class="masthead__inner">
@@ -22,6 +26,16 @@
     <p class="masthead__subtitle">Escribe un artículo corto (una cuartilla, entre 220 y 300 palabras) sobre el tema que elijas o el que te asignen.</p>
   </div>
 </header>
+
+<!-- banner de restauración: hidden por defecto, JS lo muestra si detecta
+     un borrador guardado en localStorage al cargar la página -->
+<div class="draft-banner" id="draftBanner" hidden>
+  <p class="draft-banner__text">Encontramos un borrador sin terminar. ¿Quieres continuarlo?</p>
+  <div class="draft-banner__actions">
+    <button id="draftResumeBtn" class="btn btn--primary">Continuar borrador</button>
+    <button id="draftDiscardBtn" class="btn btn--ghost">Descartar</button>
+  </div>
+</div>
 
 <main class="layout">
 
@@ -33,6 +47,12 @@
 
         <!-- topicSelect + customTopic controlados en script.js (evento change/input) -->
         <div class="page__topbar">
+          <label class="page__topic-label" for="phaseSelect">Fase</label>
+          <select id="phaseSelect" class="page__topic-select page__topic-select--phase">
+            <option value="pre">Pre-test</option>
+            <option value="post">Post-test</option>
+          </select>
+
           <label class="page__topic-label" for="topicSelect">Tema del artículo</label>
           <select id="topicSelect" class="page__topic-select">
             <option value="">— Elegir un tema —</option>
@@ -105,7 +125,16 @@
       <!-- genera Blob + <a download> -->
       <button id="downloadBtn" class="btn btn--primary">Descargar texto (.txt)</button>
       <button id="retryBtn" class="btn btn--ghost">Escribir otra vez</button>
+      <button id="compareBtn" class="btn btn--ghost">Ver comparación pre/post</button>
     </div>
+  </section>
+
+  <!-- hidden hasta compare Btn click; rellenado por renderComparison() en script.js.
+       Los datos salen de localStorage (SUBMISSIONS_KEY), no de una base de datos:
+       esta comparación es solo del navegador/equipo actual. -->
+  <section class="comparison" id="comparison" hidden aria-labelledby="comparison-titulo">
+    <h2 id="comparison-titulo">Comparación pre-test / post-test</h2>
+    <div id="comparisonBody"></div>
   </section>
 
 </main>

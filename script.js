@@ -1,9 +1,13 @@
-
+/* =========================================================
+   PRUEBA DE REDACCIÓN — versión base
+   Sin cálculo de puntajes, sin llamadas a APIs.
+   ========================================================= */
 
 // ---------- DOM refs ----------
 const topicSelect      = document.getElementById('topicSelect');
 const customTopic      = document.getElementById('customTopic');
 const promptDisplay    = document.getElementById('promptDisplay');
+const phaseSelect      = document.getElementById('phaseSelect');
 
 const editor           = document.getElementById('editor');
 const wordCountEl      = document.getElementById('wordCount');
@@ -24,10 +28,22 @@ const confirmWords       = document.getElementById('confirmWords');
 const confirmParagraphs  = document.getElementById('confirmParagraphs');
 const downloadBtn        = document.getElementById('downloadBtn');
 const retryBtn           = document.getElementById('retryBtn');
+const compareBtn         = document.getElementById('compareBtn');
+const comparisonSection  = document.getElementById('comparison');
+const comparisonBody     = document.getElementById('comparisonBody');
+
+const draftBanner       = document.getElementById('draftBanner');
+const draftResumeBtn    = document.getElementById('draftResumeBtn');
+const draftDiscardBtn   = document.getElementById('draftDiscardBtn');
+
+const themeToggle       = document.getElementById('themeToggle');
 
 // ---------- Config ----------
 const TARGET_MIN = 220;
 const TARGET_MAX = 300;
+const DRAFT_KEY = 'prueba_redaccion_draft_v1';
+const THEME_KEY = 'prueba_redaccion_theme_v1';
+const SUBMISSIONS_KEY = 'prueba_redaccion_submissions_v1'; // { pre: {...}, post: {...} }
 
 // ---------- Timer state ----------
 let seconds = 0;
@@ -49,6 +65,7 @@ function startTimer(){
   timerInterval = setInterval(() => {
     seconds++;
     timerEl.textContent = formatTime(seconds);
+    saveDraft();
   }, 1000);
 }
 
@@ -62,6 +79,7 @@ function togglePause(){
     timerInterval = setInterval(() => {
       seconds++;
       timerEl.textContent = formatTime(seconds);
+      saveDraft();
     }, 1000);
     pauseBtn.textContent = 'Pausar';
   }
@@ -77,7 +95,120 @@ function resetAll(){
   pauseBtn.disabled = true;
   editor.value = '';
   updateLiveCounters();
+  clearDraft();
 }
+
+// ---------- Draft autosave (localStorage) ----------
+// try/catch en cada llamada: localStorage puede fallar (modo privado,
+// cuota llena, entorno sin soporte) y no debe romper el resto de la página.
+function saveDraft(){
+  try {
+    const payload = {
+      topicSelectValue: topicSelect.value,
+      customTopicValue: customTopic.value,
+      promptText: promptDisplay.textContent,
+      text: editor.value,
+      seconds
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('No se pudo guardar el borrador:', err);
+  }
+}
+
+function loadDraft(){
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    console.warn('No se pudo leer el borrador guardado:', err);
+    return null;
+  }
+}
+
+function clearDraft(){
+  try { localStorage.removeItem(DRAFT_KEY); } catch (err) { /* no-op */ }
+}
+
+function resumeFromDraft(draft){
+  topicSelect.value = draft.topicSelectValue || '';
+  customTopic.hidden = draft.topicSelectValue !== '__custom__';
+  customTopic.value = draft.customTopicValue || '';
+  promptDisplay.textContent = draft.promptText || 'Elige un tema arriba para comenzar.';
+  editor.value = draft.text || '';
+  updateLiveCounters();
+
+  seconds = Number(draft.seconds) || 0;
+  timerEl.textContent = formatTime(seconds);
+  if (editor.value.trim().length > 0){
+    hasStarted = true;
+    pauseBtn.disabled = false;
+    timerInterval = setInterval(() => {
+      seconds++;
+      timerEl.textContent = formatTime(seconds);
+      saveDraft();
+    }, 1000);
+  }
+}
+
+draftResumeBtn.addEventListener('click', () => {
+  const draft = loadDraft();
+  draftBanner.hidden = true;
+  if (draft) resumeFromDraft(draft);
+});
+
+draftDiscardBtn.addEventListener('click', () => {
+  clearDraft();
+  draftBanner.hidden = true;
+});
+
+// ---------- Pre/post comparison (localStorage) ----------
+// NOTA: esto es un almacenamiento local temporal para poder ver la
+// comparación mientras el grupo 3 no tenga listo el backend + BD real.
+// Solo guarda el último intento de cada fase, y solo en este navegador.
+function loadSubmissions(){
+  try {
+    const raw = localStorage.getItem(SUBMISSIONS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveSubmissionForPhase(phase, data){
+  const all = loadSubmissions();
+  all[phase] = data;
+  try { localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(all)); } catch (err) { /* no-op */ }
+}
+
+function renderComparison(){
+  const all = loadSubmissions();
+  const pre = all.pre;
+  const post = all.post;
+
+  if (!pre || !post){
+    const faltante = !pre ? 'Pre-test' : 'Post-test';
+    comparisonBody.innerHTML = `<p>Todavía falta completar la fase "${faltante}" en este navegador para poder comparar.</p>`;
+  } else {
+    comparisonBody.innerHTML = `
+      <div class="compare-grid">
+        <div class="compare-row-header"></div>
+        <div class="compare-row-header">Pre-test</div>
+        <div class="compare-row-header">Post-test</div>
+
+        <div>Tema</div><div>${pre.topic}</div><div>${post.topic}</div>
+        <div>Tiempo</div><div>${pre.time}</div><div>${post.time}</div>
+        <div>Palabras</div><div>${pre.words}</div><div>${post.words}</div>
+        <div>Párrafos</div><div>${pre.paragraphs}</div><div>${post.paragraphs}</div>
+      </div>
+    `;
+  }
+
+  comparisonSection.hidden = false;
+  comparisonSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+compareBtn.addEventListener('click', renderComparison);
 
 // ---------- Topic select ----------
 topicSelect.addEventListener('change', () => {
@@ -141,6 +272,7 @@ editor.addEventListener('input', () => {
     startTimer();
   }
   updateLiveCounters();
+  saveDraft();
 });
 
 pauseBtn.addEventListener('click', togglePause);
@@ -157,6 +289,7 @@ submitBtn.addEventListener('click', () => {
   const paragraphs = getParagraphs(text);
 
   lastSubmission = {
+    phase: phaseSelect.value,
     topic: promptDisplay.textContent,
     text,
     words: words.length,
@@ -169,8 +302,11 @@ submitBtn.addEventListener('click', () => {
   confirmWords.textContent = `${lastSubmission.words} palabras`;
   confirmParagraphs.textContent = `${lastSubmission.paragraphs} párrafos`;
 
+  saveSubmissionForPhase(phaseSelect.value, lastSubmission);
+
   confirmation.hidden = false;
   confirmation.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  clearDraft(); // ya se entregó, no tiene sentido seguir ofreciéndolo para restaurar
 });
 
 retryBtn.addEventListener('click', () => {
@@ -207,5 +343,39 @@ downloadBtn.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// ---------- Theme toggle ----------
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggle.textContent = theme === 'light' ? 'Modo oscuro' : 'Modo claro';
+}
+
+function loadTheme(){
+  try { return localStorage.getItem(THEME_KEY); } catch (err) { return null; }
+}
+
+function saveTheme(theme){
+  try { localStorage.setItem(THEME_KEY, theme); } catch (err) { /* no-op */ }
+}
+
+themeToggle.addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  applyTheme(next);
+  saveTheme(next);
+});
+
 // ---------- Init ----------
 updateLiveCounters();
+
+// tema: localStorage > prefers-color-scheme del sistema > 'dark' por defecto
+const savedTheme = loadTheme();
+const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+applyTheme(savedTheme || (prefersLight ? 'light' : 'dark'));
+
+// Si hay un borrador con texto no vacío, ofrece restaurarlo antes de
+// que el usuario empiece a escribir (evita pisar un intento a medias
+// si se recargó la página por accidente).
+const existingDraft = loadDraft();
+if (existingDraft && existingDraft.text && existingDraft.text.trim().length > 0){
+  draftBanner.hidden = false;
+}
