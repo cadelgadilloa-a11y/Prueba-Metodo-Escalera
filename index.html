@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prueba de Redacción — Texto tipo Cuartilla</title>
 
-<!-- Fonts: display serif (Source Serif 4) + UI sans/mono (IBM Plex) -->
+<!-- Tipografías de la página -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -14,11 +14,10 @@
 </head>
 <body>
 
-<!-- data-theme en <html> lo controla script.js; toggleTheme() alterna
-     entre 'dark' (valores por defecto en :root) y 'light' ([data-theme="light"]) -->
+<!-- Botón para cambiar entre modo oscuro y claro -->
 <button id="themeToggle" class="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">Modo claro</button>
 
-<!-- Header estático, sin lógica -->
+<!-- Encabezado, solo texto -->
 <header class="masthead">
   <div class="masthead__inner">
     <p class="masthead__kicker">Prueba de redacción</p>
@@ -27,25 +26,31 @@
   </div>
 </header>
 
-<!-- banner de restauración: hidden por defecto, JS lo muestra si detecta
-     un borrador guardado en localStorage al cargar la página -->
-<div class="draft-banner" id="draftBanner" hidden>
-  <p class="draft-banner__text">Encontramos un borrador sin terminar. ¿Quieres continuarlo?</p>
-  <div class="draft-banner__actions">
-    <button id="draftResumeBtn" class="btn btn--primary">Continuar borrador</button>
-    <button id="draftDiscardBtn" class="btn btn--ghost">Descartar</button>
-  </div>
-</div>
-
 <main class="layout">
 
-  <!-- writing: grid de 2 cols (page / sidebar), colapsa a 1 col en mobile -->
-  <section class="writing" aria-labelledby="writing-titulo">
+  <!-- Formulario de datos del participante -->
+  <section class="student-info" aria-labelledby="student-info-titulo">
+    <h2 id="student-info-titulo" class="student-info__title">Datos del participante</h2>
+    <div class="student-info__fields">
+      <div class="field">
+        <label for="studentName">Nombre completo</label>
+        <input type="text" id="studentName" placeholder="Nombre y apellido">
+      </div>
+      <div class="field">
+        <label for="studentOccupation">¿Estudia o trabaja? ¿En qué?</label>
+        <input type="text" id="studentOccupation" placeholder="Ej: Estudiante de Ingeniería de Sistemas / Contador">
+      </div>
+    </div>
+    <p class="student-info__hint">El nombre es obligatorio para poder entregar.</p>
+  </section>
+
+  <!-- Hoja de escritura + barra lateral -->
+  <section class="writing" aria-labelledby="promptDisplay">
 
     <div class="writing__page">
       <div class="page">
 
-        <!-- topicSelect + customTopic controlados en script.js (evento change/input) -->
+        <!-- Selector de fase y de tema -->
         <div class="page__topbar">
           <label class="page__topic-label" for="phaseSelect">Fase</label>
           <select id="phaseSelect" class="page__topic-select page__topic-select--phase">
@@ -62,17 +67,16 @@
             <option value="La brecha digital en las zonas rurales de Colombia">La brecha digital en las zonas rurales de Colombia</option>
             <option value="__custom__">Escribir mi propio tema…</option>
           </select>
-          <!-- hidden por defecto; toggle en JS si topicSelect.value === '__custom__' -->
           <input type="text" id="customTopic" class="page__topic-custom" placeholder="Escribe el tema aquí" hidden>
         </div>
 
-        <!-- sincronizado con topicSelect/customTopic -->
-        <h2 id="writing-titulo" class="page__prompt" id="promptDisplay">Elige un tema arriba para comenzar.</h2>
+        <!-- Muestra el tema elegido -->
+        <h2 id="promptDisplay" class="page__prompt">Elige un tema arriba para comenzar.</h2>
 
-        <!-- spellcheck/autocorrect/autocapitalize/autocomplete off: sin asistencia del navegador -->
+        <!-- Corrector ortográfico del navegador apagado a propósito -->
         <textarea id="editor" class="page__editor" placeholder="Empieza a escribir tu artículo aquí. El cronómetro inicia con tu primera palabra…" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
 
-        <!-- recalculado en cada 'input' del editor -->
+        <!-- Contadores de palabras y párrafos -->
         <div class="page__footer">
           <span id="wordCount">0 palabras</span>
           <span id="paragraphCount">0 párrafos</span>
@@ -82,7 +86,7 @@
 
     <aside class="sidebar" aria-label="Indicadores en vivo">
 
-      <!-- timer: setInterval de 1000ms, ver startTimer()/togglePause() -->
+      <!-- Cronómetro -->
       <div class="sidebar__block">
         <span class="sidebar__label">Tiempo de redacción</span>
         <span class="sidebar__timer" id="timer">00:00</span>
@@ -92,7 +96,7 @@
         </div>
       </div>
 
-      <!-- width/background inline via JS según TARGET_MIN/TARGET_MAX -->
+      <!-- Barra de progreso hacia la meta de palabras -->
       <div class="sidebar__block">
         <span class="sidebar__label">Meta de extensión</span>
         <div class="meter">
@@ -101,7 +105,7 @@
         <span class="sidebar__hint" id="lengthHint">Objetivo: 220–300 palabras</span>
       </div>
 
-      <!-- estático -->
+      <!-- Recordatorios fijos -->
       <div class="sidebar__block sidebar__block--tips">
         <span class="sidebar__label">Recordatorios</span>
         <ul class="sidebar__tips">
@@ -111,27 +115,27 @@
         </ul>
       </div>
 
-      <!-- disabled hasta words.length >= 30, ver updateLiveCounters() -->
+      <!-- Botón de entrega -->
       <button id="submitBtn" class="btn btn--primary" disabled>Entregar</button>
     </aside>
   </section>
 
-  <!-- hidden hasta submitBtn click; rellenado por el listener de submitBtn -->
+  <!-- Pantalla de confirmación, oculta hasta entregar -->
   <section class="confirmation" id="confirmation" hidden aria-labelledby="confirmation-titulo">
     <h2 id="confirmation-titulo">Texto entregado</h2>
+    <p>Participante: <strong id="confirmStudent"></strong></p>
     <p>Tema: <strong id="confirmTopic"></strong></p>
     <p>Tiempo de redacción: <strong id="confirmTime"></strong> · <span id="confirmWords"></span> · <span id="confirmParagraphs"></span></p>
+    <!-- Placeholder de la nota, hasta que exista backend -->
+    <p>Nota: <strong id="confirmGrade">Pendiente — la calculará el backend cuando esté conectado</strong></p>
     <div class="confirmation__actions">
-      <!-- genera Blob + <a download> -->
       <button id="downloadBtn" class="btn btn--primary">Descargar texto (.txt)</button>
       <button id="retryBtn" class="btn btn--ghost">Escribir otra vez</button>
       <button id="compareBtn" class="btn btn--ghost">Ver comparación pre/post</button>
     </div>
   </section>
 
-  <!-- hidden hasta compare Btn click; rellenado por renderComparison() en script.js.
-       Los datos salen de localStorage (SUBMISSIONS_KEY), no de una base de datos:
-       esta comparación es solo del navegador/equipo actual. -->
+  <!-- Comparación pre-test/post-test, oculta hasta pedirla -->
   <section class="comparison" id="comparison" hidden aria-labelledby="comparison-titulo">
     <h2 id="comparison-titulo">Comparación pre-test / post-test</h2>
     <div id="comparisonBody"></div>

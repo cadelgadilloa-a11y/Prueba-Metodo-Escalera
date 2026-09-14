@@ -1,13 +1,12 @@
-/* =========================================================
-   PRUEBA DE REDACCIÓN — versión base
-   Sin cálculo de puntajes, sin llamadas a APIs.
-   ========================================================= */
 
-// ---------- DOM refs ----------
+// Referencias a los elementos del HTML
 const topicSelect      = document.getElementById('topicSelect');
 const customTopic      = document.getElementById('customTopic');
 const promptDisplay    = document.getElementById('promptDisplay');
 const phaseSelect      = document.getElementById('phaseSelect');
+
+const studentName       = document.getElementById('studentName');
+const studentOccupation = document.getElementById('studentOccupation');
 
 const editor           = document.getElementById('editor');
 const wordCountEl      = document.getElementById('wordCount');
@@ -22,42 +21,42 @@ const lengthHint        = document.getElementById('lengthHint');
 
 const submitBtn          = document.getElementById('submitBtn');
 const confirmation       = document.getElementById('confirmation');
+const confirmStudent     = document.getElementById('confirmStudent');
 const confirmTopic       = document.getElementById('confirmTopic');
 const confirmTime        = document.getElementById('confirmTime');
 const confirmWords       = document.getElementById('confirmWords');
 const confirmParagraphs  = document.getElementById('confirmParagraphs');
+const confirmGrade       = document.getElementById('confirmGrade');
 const downloadBtn        = document.getElementById('downloadBtn');
 const retryBtn           = document.getElementById('retryBtn');
 const compareBtn         = document.getElementById('compareBtn');
 const comparisonSection  = document.getElementById('comparison');
 const comparisonBody     = document.getElementById('comparisonBody');
 
-const draftBanner       = document.getElementById('draftBanner');
-const draftResumeBtn    = document.getElementById('draftResumeBtn');
-const draftDiscardBtn   = document.getElementById('draftDiscardBtn');
-
 const themeToggle       = document.getElementById('themeToggle');
 
-// ---------- Config ----------
+// Rango de palabras que debe tener el texto
 const TARGET_MIN = 220;
 const TARGET_MAX = 300;
-const DRAFT_KEY = 'prueba_redaccion_draft_v1';
-const THEME_KEY = 'prueba_redaccion_theme_v1';
-const SUBMISSIONS_KEY = 'prueba_redaccion_submissions_v1'; // { pre: {...}, post: {...} }
 
-// ---------- Timer state ----------
+// Nombres usados para guardar datos en el navegador
+const THEME_KEY = 'prueba_redaccion_theme_v1';
+const SUBMISSIONS_KEY = 'prueba_redaccion_submissions_v1';
+
+// Estado del cronómetro
 let seconds = 0;
 let timerInterval = null;
 let hasStarted = false;
 let isPaused = false;
 
+// Convierte segundos a formato "02:35"
 function formatTime(totalSeconds){
   const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
   const s = String(totalSeconds % 60).padStart(2, '0');
   return `${m}:${s}`;
 }
 
-// idempotente: no-op si ya está corriendo
+// Arranca el cronómetro
 function startTimer(){
   if (hasStarted) return;
   hasStarted = true;
@@ -65,10 +64,10 @@ function startTimer(){
   timerInterval = setInterval(() => {
     seconds++;
     timerEl.textContent = formatTime(seconds);
-    saveDraft();
   }, 1000);
 }
 
+// Pausa o reanuda el cronómetro
 function togglePause(){
   if (!hasStarted) return;
   isPaused = !isPaused;
@@ -79,12 +78,12 @@ function togglePause(){
     timerInterval = setInterval(() => {
       seconds++;
       timerEl.textContent = formatTime(seconds);
-      saveDraft();
     }, 1000);
     pauseBtn.textContent = 'Pausar';
   }
 }
 
+// Reinicia el cronómetro y vacía el editor
 function resetAll(){
   clearInterval(timerInterval);
   seconds = 0;
@@ -95,77 +94,9 @@ function resetAll(){
   pauseBtn.disabled = true;
   editor.value = '';
   updateLiveCounters();
-  clearDraft();
 }
 
-// ---------- Draft autosave (localStorage) ----------
-// try/catch en cada llamada: localStorage puede fallar (modo privado,
-// cuota llena, entorno sin soporte) y no debe romper el resto de la página.
-function saveDraft(){
-  try {
-    const payload = {
-      topicSelectValue: topicSelect.value,
-      customTopicValue: customTopic.value,
-      promptText: promptDisplay.textContent,
-      text: editor.value,
-      seconds
-    };
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
-  } catch (err) {
-    console.warn('No se pudo guardar el borrador:', err);
-  }
-}
-
-function loadDraft(){
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (err) {
-    console.warn('No se pudo leer el borrador guardado:', err);
-    return null;
-  }
-}
-
-function clearDraft(){
-  try { localStorage.removeItem(DRAFT_KEY); } catch (err) { /* no-op */ }
-}
-
-function resumeFromDraft(draft){
-  topicSelect.value = draft.topicSelectValue || '';
-  customTopic.hidden = draft.topicSelectValue !== '__custom__';
-  customTopic.value = draft.customTopicValue || '';
-  promptDisplay.textContent = draft.promptText || 'Elige un tema arriba para comenzar.';
-  editor.value = draft.text || '';
-  updateLiveCounters();
-
-  seconds = Number(draft.seconds) || 0;
-  timerEl.textContent = formatTime(seconds);
-  if (editor.value.trim().length > 0){
-    hasStarted = true;
-    pauseBtn.disabled = false;
-    timerInterval = setInterval(() => {
-      seconds++;
-      timerEl.textContent = formatTime(seconds);
-      saveDraft();
-    }, 1000);
-  }
-}
-
-draftResumeBtn.addEventListener('click', () => {
-  const draft = loadDraft();
-  draftBanner.hidden = true;
-  if (draft) resumeFromDraft(draft);
-});
-
-draftDiscardBtn.addEventListener('click', () => {
-  clearDraft();
-  draftBanner.hidden = true;
-});
-
-// ---------- Pre/post comparison (localStorage) ----------
-// NOTA: esto es un almacenamiento local temporal para poder ver la
-// comparación mientras el grupo 3 no tenga listo el backend + BD real.
-// Solo guarda el último intento de cada fase, y solo en este navegador.
+// Lee los intentos guardados (pre/post) del navegador
 function loadSubmissions(){
   try {
     const raw = localStorage.getItem(SUBMISSIONS_KEY);
@@ -175,12 +106,14 @@ function loadSubmissions(){
   }
 }
 
+// Guarda un intento bajo su fase (pre o post)
 function saveSubmissionForPhase(phase, data){
   const all = loadSubmissions();
   all[phase] = data;
-  try { localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(all)); } catch (err) { /* no-op */ }
+  try { localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(all)); } catch (err) {}
 }
 
+// Muestra la tabla comparando el pre-test con el post-test
 function renderComparison(){
   const all = loadSubmissions();
   const pre = all.pre;
@@ -210,7 +143,7 @@ function renderComparison(){
 
 compareBtn.addEventListener('click', renderComparison);
 
-// ---------- Topic select ----------
+// Actualiza el título del tema cuando cambia el selector
 topicSelect.addEventListener('change', () => {
   if (topicSelect.value === '__custom__'){
     customTopic.hidden = false;
@@ -226,22 +159,23 @@ topicSelect.addEventListener('change', () => {
   }
 });
 
+// Actualiza el título del tema cuando se escribe uno propio
 customTopic.addEventListener('input', () => {
   promptDisplay.textContent = customTopic.value || 'Escribe tu propio tema en el campo de arriba.';
 });
 
-// ---------- Counters ----------
-// regex: solo secuencias de letras (con tildes/ñ), sin dígitos ni puntuación
+// Cuenta las palabras del texto
 function getWords(text){
   const matches = text.trim().match(/[a-záéíóúüñ]+/gi);
   return matches ? matches : [];
 }
 
-// párrafo = bloque separado por línea en blanco (\n\s*\n)
+// Separa el texto en párrafos
 function getParagraphs(text){
   return text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
 }
 
+// Actualiza los contadores, la barra de progreso y si se puede entregar
 function updateLiveCounters(){
   const text = editor.value;
   const words = getWords(text);
@@ -264,24 +198,43 @@ function updateLiveCounters(){
     lengthHint.textContent = `Objetivo: 220–300 palabras · ${words.length - TARGET_MAX} de más`;
   }
 
-  submitBtn.disabled = words.length < 30;
+  submitBtn.disabled = words.length < 30 || !studentName.value.trim();
 }
 
+studentName.addEventListener('input', updateLiveCounters);
+
+// Arranca el cronómetro al escribir y recalcula los contadores
 editor.addEventListener('input', () => {
   if (!hasStarted && editor.value.trim().length > 0){
     startTimer();
   }
   updateLiveCounters();
-  saveDraft();
 });
 
 pauseBtn.addEventListener('click', togglePause);
 resetBtn.addEventListener('click', resetAll);
 
-// ---------- Submit ----------
-let lastSubmission = null; // usado por downloadBtn
+// Función pendiente de conectar con el backend del grupo 3.
+// Hoy solo imprime los datos en consola, no hace ninguna conexión real.
+async function sendToBackend(payload){
+  console.log('[pendiente de backend] esto es lo que se enviaría:', payload);
 
-submitBtn.addEventListener('click', () => {
+  // const res = await fetch('https://<url-del-backend>/api/intentos', {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify(payload)
+  // });
+  // const data = await res.json();
+  // return data.nota;
+
+  return null;
+}
+
+// Guarda los datos de la última entrega
+let lastSubmission = null;
+
+// Arma y muestra la entrega al hacer clic en "Entregar"
+submitBtn.addEventListener('click', async () => {
   clearInterval(timerInterval);
 
   const text = editor.value;
@@ -289,6 +242,10 @@ submitBtn.addEventListener('click', () => {
   const paragraphs = getParagraphs(text);
 
   lastSubmission = {
+    student: {
+      name: studentName.value.trim(),
+      occupation: studentOccupation.value.trim()
+    },
     phase: phaseSelect.value,
     topic: promptDisplay.textContent,
     text,
@@ -297,26 +254,34 @@ submitBtn.addEventListener('click', () => {
     time: formatTime(seconds)
   };
 
+  confirmStudent.textContent = lastSubmission.student.occupation
+    ? `${lastSubmission.student.name} (${lastSubmission.student.occupation})`
+    : lastSubmission.student.name;
   confirmTopic.textContent = lastSubmission.topic;
   confirmTime.textContent = lastSubmission.time;
   confirmWords.textContent = `${lastSubmission.words} palabras`;
   confirmParagraphs.textContent = `${lastSubmission.paragraphs} párrafos`;
+  confirmGrade.textContent = 'Pendiente — la calculará el backend cuando esté conectado';
 
   saveSubmissionForPhase(phaseSelect.value, lastSubmission);
 
   confirmation.hidden = false;
   confirmation.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  clearDraft(); // ya se entregó, no tiene sentido seguir ofreciéndolo para restaurar
+
+  const nota = await sendToBackend(lastSubmission);
+  if (nota !== null && nota !== undefined){
+    confirmGrade.textContent = nota;
+  }
 });
 
+// Vuelve a la pantalla de escritura, vacía
 retryBtn.addEventListener('click', () => {
   confirmation.hidden = true;
   resetAll();
   editor.focus();
 });
 
-// ---------- Download ----------
-// Blob + <a download> + URL.createObjectURL; sin dependencias externas
+// Descarga el texto entregado como archivo .txt
 downloadBtn.addEventListener('click', () => {
   if (!lastSubmission) return;
 
@@ -324,9 +289,13 @@ downloadBtn.addEventListener('click', () => {
     'TEXTO DE PRUEBA DE REDACCIÓN',
     '='.repeat(40),
     `Fecha: ${new Date().toLocaleString('es-CO')}`,
+    `Participante: ${lastSubmission.student.name}`,
+    `Ocupación / estudios: ${lastSubmission.student.occupation || '(no especificado)'}`,
+    `Fase: ${lastSubmission.phase === 'pre' ? 'Pre-test' : 'Post-test'}`,
     `Tema: ${lastSubmission.topic}`,
     `Tiempo de redacción: ${lastSubmission.time}`,
     `Palabras: ${lastSubmission.words} | Párrafos: ${lastSubmission.paragraphs}`,
+    `Nota: ${confirmGrade.textContent}`,
     '-'.repeat(40),
     '',
     lastSubmission.text
@@ -343,18 +312,20 @@ downloadBtn.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-// ---------- Theme toggle ----------
+// Cambia entre modo oscuro y modo claro
 function applyTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
   themeToggle.textContent = theme === 'light' ? 'Modo oscuro' : 'Modo claro';
 }
 
+// Lee el tema guardado
 function loadTheme(){
   try { return localStorage.getItem(THEME_KEY); } catch (err) { return null; }
 }
 
+// Guarda el tema elegido
 function saveTheme(theme){
-  try { localStorage.setItem(THEME_KEY, theme); } catch (err) { /* no-op */ }
+  try { localStorage.setItem(THEME_KEY, theme); } catch (err) {}
 }
 
 themeToggle.addEventListener('click', () => {
@@ -364,18 +335,9 @@ themeToggle.addEventListener('click', () => {
   saveTheme(next);
 });
 
-// ---------- Init ----------
+// Se ejecuta al cargar la página
 updateLiveCounters();
 
-// tema: localStorage > prefers-color-scheme del sistema > 'dark' por defecto
 const savedTheme = loadTheme();
 const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
 applyTheme(savedTheme || (prefersLight ? 'light' : 'dark'));
-
-// Si hay un borrador con texto no vacío, ofrece restaurarlo antes de
-// que el usuario empiece a escribir (evita pisar un intento a medias
-// si se recargó la página por accidente).
-const existingDraft = loadDraft();
-if (existingDraft && existingDraft.text && existingDraft.text.trim().length > 0){
-  draftBanner.hidden = false;
-}

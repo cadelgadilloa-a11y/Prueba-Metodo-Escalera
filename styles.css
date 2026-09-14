@@ -1,33 +1,40 @@
-
+/* Colores y variables de toda la página */
 :root{
-  --bg: #12151C;
-  --surface: #1B2029;
-  --surface-2: #232937;
-  --paper: #F3EFE4;
-  --ink: #23211C;
-  --ink-soft: #55503f;
-  --text: #E9E7DF;
-  --muted: #939AAC;
-  --red: #B23A3A;
-  --red-soft: #7a2b2b;
+  /* Modo oscuro (el que se ve por defecto) */
+  --bg: #14121C;
+  --surface: #1C1926;
+  --surface-2: #262232;
+  --text: #EDEAF0;
+  --muted: #93899F;
+  --red: #A8456B;
+  --red-soft: #7A3350;
   --green: #4C8C6B;
-  --gold: #C9A227;
-  --line: #2E3542;
+  --gold: #E3A7AE;
+  --line: #332E42;
+
+  /* Colores de la hoja donde se escribe (oscura, no blanca) */
+  --page-bg: #17141F;
+  --page-text: #E4DEE6;
+  --page-text-soft: #8B8296;
+  --page-border: #352E45;
+  --page-input-bg: #201C2C;
+  --page-placeholder: #6b6478;
+  --page-shadow: 0 24px 60px -28px rgba(5,4,10,0.9), inset 0 0 0 1px rgba(255,255,255,0.02);
+
+  --card-shadow: 0 10px 26px -20px rgba(5,4,10,0.65);
+
   --font-display: "Source Serif 4", Georgia, serif;
   --font-body: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
   --radius: 3px;
 }
 
-/* Tema claro: mismo set de variables, valores distintos.
-   Se activa con [data-theme="light"] en <html> (ver script.js). */
+/* Modo claro: mismas variables, otros valores. Se activa con
+   data-theme="light" en <html>, lo pone script.js */
 [data-theme="light"]{
   --bg: #F5F3EE;
   --surface: #FFFFFF;
   --surface-2: #ECE8DE;
-  --paper: #FFFFFF;
-  --ink: #23211C;
-  --ink-soft: #6b6454;
   --text: #23222A;
   --muted: #6b7280;
   --red: #A63333;
@@ -35,6 +42,16 @@
   --green: #3f7d5c;
   --gold: #9c7a1a;
   --line: #DDD8C9;
+
+  --page-bg: #FFFFFF;
+  --page-text: #23211C;
+  --page-text-soft: #6b6454;
+  --page-border: #cfc7ad;
+  --page-input-bg: #fbf9f2;
+  --page-placeholder: #9a927a;
+  --page-shadow: 0 18px 40px -24px rgba(0,0,0,0.18);
+
+  --card-shadow: 0 8px 20px -18px rgba(0,0,0,0.12);
 }
 
 *{ box-sizing: border-box; }
@@ -50,7 +67,7 @@ body{
 
 button{ font-family: inherit; }
 
-/* Botón fijo de alternar tema, siempre visible en la esquina */
+/* Botón de modo oscuro/claro, fijo arriba a la derecha */
 .theme-toggle{
   position: fixed;
   top: 1rem;
@@ -63,6 +80,7 @@ button{ font-family: inherit; }
   padding: 0.5rem 1rem;
   font-size: 0.8rem;
   cursor: pointer;
+  box-shadow: var(--card-shadow);
   transition: border-color 0.15s ease;
 }
 .theme-toggle:hover{ border-color: var(--muted); }
@@ -71,11 +89,12 @@ button{ font-family: inherit; }
   .theme-toggle{ top: 0.7rem; right: 0.7rem; font-size: 0.72rem; padding: 0.4rem 0.75rem; }
 }
 
+/* Quita animaciones si el usuario las tiene desactivadas */
 @media (prefers-reduced-motion: reduce){
   *{ animation: none !important; transition: none !important; }
 }
 
-/* ============ MASTHEAD ============ */
+/* Encabezado */
 .masthead{
   border-bottom: 1px solid var(--line);
   padding: 3rem 1.5rem 2.25rem;
@@ -106,34 +125,7 @@ button{ font-family: inherit; }
   margin: 0;
 }
 
-/* ============ DRAFT BANNER ============ */
-/* hidden attr controlado por JS (localStorage check en Init) */
-.draft-banner{
-  max-width: 1180px;
-  margin: 1.25rem auto 0;
-  padding: 0.9rem 1.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.9rem;
-  background: var(--surface);
-  border: 1px solid var(--gold);
-  border-radius: var(--radius);
-}
-.draft-banner__text{
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--text);
-}
-.draft-banner__actions{
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-.draft-banner__actions .btn{ width: auto; }
-
-/* ============ LAYOUT ============ */
+/* Contenedor general de la página */
 .layout{
   max-width: 1180px;
   margin: 0 auto;
@@ -143,8 +135,57 @@ button{ font-family: inherit; }
   gap: 2.25rem;
 }
 
-/* ============ WRITING AREA ============ */
-/* grid 2 cols: page (1fr) + sidebar (280px fija) */
+/* Formulario de datos del participante */
+.student-info{
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.2rem 1.4rem;
+  box-shadow: var(--card-shadow);
+}
+.student-info__title{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin: 0 0 1rem;
+}
+.student-info__fields{
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+.field{
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.field label{
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.field input{
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.field input:focus{ outline: 1px solid var(--gold); outline-offset: 1px; }
+.student-info__hint{
+  margin: 0.9rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Campos en una sola columna en pantallas angostas */
+@media (max-width: 700px){
+  .student-info__fields{ grid-template-columns: 1fr; }
+}
+
+/* Área de escritura: hoja + barra lateral */
 .writing{
   display: grid;
   grid-template-columns: 1fr 280px;
@@ -153,11 +194,12 @@ button{ font-family: inherit; }
 }
 
 .page{
-  background: var(--paper);
-  color: var(--ink);
-  border-radius: 2px;
+  background: var(--page-bg);
+  color: var(--page-text);
+  border: 1px solid var(--page-border);
+  border-radius: 4px;
   padding: 1.9rem 1.9rem 1.1rem;
-  box-shadow: 0 18px 40px -20px rgba(0,0,0,0.6);
+  box-shadow: var(--page-shadow);
   min-height: 560px;
   display: flex;
   flex-direction: column;
@@ -170,25 +212,25 @@ button{ font-family: inherit; }
   gap: 0.6rem;
   margin-bottom: 1.1rem;
   padding-bottom: 1rem;
-  border-bottom: 1px dashed #cfc7ad;
+  border-bottom: 1px dashed var(--page-border);
 }
 .page__topic-label{
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--ink-soft);
+  color: var(--page-text-soft);
 }
 .page__topic-select, .page__topic-custom{
   font-family: var(--font-body);
   font-size: 0.88rem;
   padding: 0.4rem 0.6rem;
-  border: 1px solid #cfc7ad;
-  background: #fbf9f2;
-  color: var(--ink);
+  border: 1px solid var(--page-border);
+  background: var(--page-input-bg);
+  color: var(--page-text);
   border-radius: 2px;
   flex: 1 1 220px;
   min-width: 0;
 }
-/* el selector de fase es más angosto que el de tema */
+/* selector de Fase, más angosto que el de Tema */
 .page__topic-select--phase{
   flex: 0 1 130px;
 }
@@ -198,7 +240,7 @@ button{ font-family: inherit; }
   font-weight: 600;
   font-size: 1.4rem;
   margin: 0 0 1.1rem;
-  color: var(--ink);
+  color: var(--page-text);
 }
 
 .page__editor{
@@ -207,26 +249,27 @@ button{ font-family: inherit; }
   resize: vertical;
   border: none;
   background: transparent;
-  color: var(--ink);
+  color: var(--page-text);
   font-family: var(--font-display);
-  font-size: 1.12rem;
-  line-height: 1.75;
+  font-size: 1.14rem;
+  line-height: 1.85;
+  letter-spacing: 0.01em;
   outline: none;
 }
-.page__editor::placeholder{ color: #9a927a; }
+.page__editor::placeholder{ color: var(--page-placeholder); }
 
 .page__footer{
   display: flex;
   justify-content: space-between;
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: var(--ink-soft);
+  color: var(--page-text-soft);
   padding-top: 0.9rem;
   margin-top: 0.6rem;
-  border-top: 1px dashed #cfc7ad;
+  border-top: 1px dashed var(--page-border);
 }
 
-/* ============ SIDEBAR ============ */
+/* Barra lateral: cronómetro, meta de palabras y recordatorios */
 .sidebar{
   display: flex;
   flex-direction: column;
@@ -239,6 +282,7 @@ button{ font-family: inherit; }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 1rem 1.1rem;
+  box-shadow: var(--card-shadow);
 }
 .sidebar__label{
   display: block;
@@ -259,7 +303,7 @@ button{ font-family: inherit; }
   gap: 0.5rem;
 }
 
-/* width/background: seteados inline por JS */
+/* Barra de progreso: ancho y color los cambia script.js */
 .meter{
   height: 8px;
   background: var(--surface-2);
@@ -288,7 +332,7 @@ button{ font-family: inherit; }
   gap: 0.5rem;
 }
 
-/* ============ BUTTONS ============ */
+/* Botones: primario (relleno) y secundario (solo borde) */
 .btn{
   border-radius: 2px;
   border: 1px solid transparent;
@@ -296,7 +340,7 @@ button{ font-family: inherit; }
   font-size: 0.88rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
+  transition: background 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
 }
 .btn--primary{
   background: var(--red);
@@ -315,8 +359,7 @@ button{ font-family: inherit; }
 .btn--ghost:hover:not(:disabled){ border-color: var(--muted); }
 .btn--ghost:disabled{ opacity: 0.4; cursor: not-allowed; }
 
-/* ============ CONFIRMATION ============ */
-/* hidden attr controlado por JS en submitBtn/retryBtn */
+/* Pantalla de confirmación (oculta hasta entregar) */
 .confirmation{
   border-top: 1px solid var(--line);
   padding-top: 2rem;
@@ -340,8 +383,7 @@ button{ font-family: inherit; }
 }
 .confirmation__actions .btn{ width: auto; min-width: 200px; }
 
-/* ============ COMPARISON ============ */
-/* hidden attr controlado por JS (compareBtn click -> renderComparison()) */
+/* Comparación pre-test / post-test (oculta hasta pedirla) */
 .comparison{
   border-top: 1px solid var(--line);
   padding-top: 2rem;
@@ -362,6 +404,7 @@ button{ font-family: inherit; }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 1.1rem 1.3rem;
+  box-shadow: var(--card-shadow);
 }
 .compare-grid > div{
   padding: 0.4rem 0;
@@ -385,7 +428,7 @@ button{ font-family: inherit; }
   .compare-grid{ grid-template-columns: 90px 1fr 1fr; font-size: 0.8rem; }
 }
 
-/* ============ FOOTER ============ */
+/* Pie de página */
 .site-footer{
   border-top: 1px solid var(--line);
   padding: 1.6rem 1.5rem 2.4rem;
@@ -399,8 +442,7 @@ button{ font-family: inherit; }
   margin: 0 auto;
 }
 
-/* ============ RESPONSIVE ============ */
-/* <860px: grid 2 cols -> 1 col, sidebar pasa a row de bloques */
+/* Ajustes para pantallas medianas: hoja y barra lateral se apilan */
 @media (max-width: 860px){
   .writing{ grid-template-columns: 1fr; }
   .sidebar{
@@ -413,7 +455,7 @@ button{ font-family: inherit; }
   #submitBtn{ flex-basis: 100%; }
 }
 
-/* <520px: ajuste de padding para mobile */
+/* Ajustes para celulares */
 @media (max-width: 520px){
   .masthead{ padding: 2.2rem 1.1rem 1.8rem; }
   .layout{ padding: 1.6rem 1.1rem 3rem; }
