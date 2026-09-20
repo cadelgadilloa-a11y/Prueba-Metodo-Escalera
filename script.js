@@ -30,6 +30,7 @@ const confirmWords       = document.getElementById('confirmWords');
 const confirmParagraphs  = document.getElementById('confirmParagraphs');
 const confirmGrade       = document.getElementById('confirmGrade');
 const rubricResults      = document.getElementById('rubricResults');
+const retryGradeBtn      = document.getElementById('retryGradeBtn');
 const downloadBtn        = document.getElementById('downloadBtn');
 const retryBtn           = document.getElementById('retryBtn');
 const compareBtn         = document.getElementById('compareBtn');
@@ -141,6 +142,7 @@ function resetAll(){
 
   rubricResults.hidden = true;
   rubricResults.innerHTML = '';
+  retryGradeBtn.hidden = true;
   updateLiveCounters();
 }
 
@@ -396,6 +398,34 @@ function pintarRubrica(resultado, { parcial = false } = {}){
   rubricResults.hidden = false;
 }
 
+// Traduce la causa tecnica del fallo a algo que el participante pueda entender
+// y, sobre todo, que le diga si vale la pena reintentar.
+function mensajeDeFallo(resultado){
+  switch (resultado.causa){
+    case 'saturacion':
+      return 'El servicio de IA esta saturado en este momento. No es un problema de tu texto. Pulsa "Reintentar calificacion" en un minuto.';
+    case 'cuota':
+      return 'Se agoto la cuota diaria del servicio de IA. La calificacion tendra que hacerse mas tarde o a mano.';
+    case 'esquema':
+      return 'La IA respondio en un formato inesperado. Queda para revision manual.';
+    default:
+      return 'No se pudo completar la calificacion automatica. Tu texto si quedo guardado.';
+  }
+}
+
+// Pinta el resultado de una calificacion final, exitosa o fallida.
+function mostrarResultadoFinal(resultado){
+  if (resultado.error){
+    confirmGrade.textContent = mensajeDeFallo(resultado);
+    retryGradeBtn.hidden = !resultado.reintentable;
+    console.warn('[calificacion]', resultado.error);
+  } else {
+    confirmGrade.textContent = `${resultado.notaGlobal} / 100`;
+    retryGradeBtn.hidden = true;
+  }
+  pintarRubrica(resultado);
+}
+
 // ---------------------------------------------------------------------------
 // Entrega
 // ---------------------------------------------------------------------------
@@ -429,7 +459,7 @@ submitBtn.addEventListener('click', async () => {
   confirmTime.textContent = lastSubmission.time;
   confirmWords.textContent = `${lastSubmission.words} palabras`;
   confirmParagraphs.textContent = `${lastSubmission.paragraphs} párrafos`;
-  confirmGrade.textContent = 'Calculando…';
+  confirmGrade.textContent = 'Calculando… (puede tardar hasta un minuto)';
 
   confirmation.hidden = false;
   confirmation.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -443,15 +473,29 @@ submitBtn.addEventListener('click', async () => {
     const resultado = await API.entregar(id, { texto: text, segundos: seconds });
     lastSubmission.nota = resultado.notaGlobal;
 
-    if (resultado.error){
-      confirmGrade.textContent = 'Pendiente de revisión manual — el análisis automático falló';
-      console.warn('[entrega]', resultado.error);
-    } else {
-      confirmGrade.textContent = `${resultado.notaGlobal} / 100`;
-    }
-    pintarRubrica(resultado);
+    mostrarResultadoFinal(resultado);
   } catch (err){
     confirmGrade.textContent = `No se pudo calificar: ${err.message}`;
+  }
+});
+
+// Reintenta la calificacion sobre el texto ya entregado, sin reabrir la sesion.
+retryGradeBtn.addEventListener('click', async () => {
+  if (!sesionId) return;
+  retryGradeBtn.disabled = true;
+  const etiqueta = retryGradeBtn.textContent;
+  retryGradeBtn.textContent = 'Reintentando…';
+  confirmGrade.textContent = 'Calculando… (puede tardar hasta un minuto)';
+
+  try {
+    const resultado = await API.recalificar(sesionId);
+    lastSubmission && (lastSubmission.nota = resultado.notaGlobal);
+    mostrarResultadoFinal(resultado);
+  } catch (err){
+    confirmGrade.textContent = `No se pudo reintentar: ${err.message}`;
+  } finally {
+    retryGradeBtn.disabled = false;
+    retryGradeBtn.textContent = etiqueta;
   }
 });
 

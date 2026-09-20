@@ -53,6 +53,10 @@ const API = {
     return this._pedir('POST', `/api/sesiones/${sesionId}/entregar`, { texto, segundos });
   },
 
+  recalificar(sesionId){
+    return this._pedir('POST', `/api/sesiones/${sesionId}/recalificar`);
+  },
+
   comparar(codigo){
     return this._pedir('GET', `/api/participantes/${encodeURIComponent(codigo)}/comparar`);
   }

@@ -33,15 +33,35 @@ export async function analizar({ prompt, señal }){
     }
   };
 
-  const res = await fetch(`${BASE}/models/${modelo}:generateContent`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey
-    },
-    body: JSON.stringify(cuerpo),
-    signal: señal
-  });
+  // Timeout explícito: medido el 2026-09-20, una calificación completa con
+  // gemini-3.5-flash puede tardar casi 60 s. Sin techo, una petición colgada
+  // bloquearía el turno del participante indefinidamente.
+  const porTiempo = AbortSignal.timeout(120000);
+  const combinada = señal ? AbortSignal.any([señal, porTiempo]) : porTiempo;
+
+  let res;
+  try {
+    res = await fetch(`${BASE}/models/${modelo}:generateContent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify(cuerpo),
+      signal: combinada
+    });
+  } catch (err){
+    // Si quien canceló fue el analizador (texto nuevo), se propaga tal cual.
+    if (señal?.aborted) throw err;
+    // Un timeout o un fallo de red sí merecen reintento.
+    const fallo = new Error(
+      err.name === 'TimeoutError'
+        ? `Gemini no respondió en 120 s (modelo ${modelo})`
+        : `No se pudo contactar a Gemini: ${err.message}`
+    );
+    fallo.esTransitorio = true;
+    throw fallo;
+  }
 
   if (!res.ok){
     const detalle = await res.text().catch(() => '');

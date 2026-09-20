@@ -124,6 +124,39 @@ rutasSesiones.post('/:id/entregar', async (req, res, next) => {
   }
 });
 
+// POST /api/sesiones/:id/recalificar — reintenta la calificación final de una
+// sesión ya entregada, sobre el texto que quedó guardado.
+//
+// Existe porque el proveedor de IA falla de forma intermitente (503 por
+// saturación). Sin esto, un pico de demanda de Google dejaría al participante
+// sin nota de forma permanente, aunque su texto esté intacto en la base.
+// No vuelve a abrir la sesión ni permite editar: el texto evaluado es el mismo.
+rutasSesiones.post('/:id/recalificar', async (req, res, next) => {
+  try {
+    const sesion = db.prepare('SELECT * FROM sesiones WHERE id = ?').get(req.params.id);
+    if (!sesion) return res.status(404).json({ error: 'Sesión no encontrada' });
+    if (!sesion.texto_final){
+      return res.status(409).json({ error: 'Esta sesión todavía no se ha entregado' });
+    }
+
+    const resultado = await analizarTexto({
+      sesionId: sesion.id,
+      texto: sesion.texto_final,
+      tema: sesion.tema,
+      tipo: 'final'
+    });
+
+    // Si esta vez sí calificó, la sesión vuelve a estado normal.
+    if (!resultado.error){
+      db.prepare("UPDATE sesiones SET estado = 'entregada' WHERE id = ?").run(sesion.id);
+    }
+
+    res.json(resultado);
+  } catch (err){
+    next(err);
+  }
+});
+
 // GET /api/sesiones/:id — estado de una sesión.
 rutasSesiones.get('/:id', (req, res) => {
   const sesion = db.prepare(`

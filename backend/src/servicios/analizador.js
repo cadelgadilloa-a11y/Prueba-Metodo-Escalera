@@ -21,20 +21,33 @@ const enVuelo = new Map();
 const esperar = ms => new Promise(r => setTimeout(r, ms));
 
 // Reintenta los fallos pasajeros del proveedor (503 por saturación, 5xx, 429).
-// Un participante no debería quedarse sin nota porque el modelo estaba ocupado
-// tres segundos. Los errores permanentes (404 de modelo inexistente, 400 de
-// petición mal formada, 401 de key inválida) NO se reintentan: fallan de una.
-async function llamarConReintentos(proveedor, argumentos, intentos = 3){
+// Un participante no debería quedarse sin nota porque el modelo estaba ocupado.
+// Los errores permanentes (404 de modelo inexistente, 400 de petición mal
+// formada, 401 de key inválida) NO se reintentan: fallan de una.
+//
+// Las esperas son largas a propósito: los 503 de "high demand" de Gemini no se
+// resuelven en milisegundos. Medido el 2026-09-20, un pico de saturación
+// rechazaba tres intentos seguidos separados por segundos.
+const ESPERAS_MS = [2000, 5000, 12000, 25000]; // 5 intentos en total, ~44 s
+
+async function llamarConReintentos(proveedor, argumentos){
+  const intentos = ESPERAS_MS.length + 1;
   let ultimoError;
+
   for (let intento = 1; intento <= intentos; intento++){
     try {
       return await proveedor.analizar(argumentos);
     } catch (err){
       if (err.name === 'AbortError') throw err;
-      if (!err.esTransitorio || intento === intentos) throw err;
+      if (!err.esTransitorio || intento === intentos){
+        // Al agotar los reintentos se enriquece el mensaje para que quien lo
+        // lea sepa que es saturación del proveedor y no un fallo del texto.
+        if (err.esTransitorio) err.agotoReintentos = true;
+        throw err;
+      }
       ultimoError = err;
-      const espera = 1500 * intento; // 1.5 s, luego 3 s
-      console.warn(`[ia] intento ${intento}/${intentos} falló (${err.status}); reintentando en ${espera} ms`);
+      const espera = ESPERAS_MS[intento - 1];
+      console.warn(`[ia] intento ${intento}/${intentos} falló (${err.status}); reintentando en ${espera / 1000} s`);
       await esperar(espera);
     }
   }
@@ -73,6 +86,7 @@ export async function analizarTexto({ sesionId, texto, tema, tipo = 'parcial' })
 
   let resultadoIA = null;
   let errorIA = null;
+  let causaIA = null;   // 'cuota' | 'saturacion' | 'esquema' | 'otro'
 
   try {
     const bruto = await llamarConReintentos(proveedor, { prompt, metricas, señal: control.signal });
@@ -82,14 +96,22 @@ export async function analizarTexto({ sesionId, texto, tema, tipo = 'parcial' })
     const validado = EsquemaAnalisis.safeParse(bruto.respuesta);
     if (!validado.success){
       errorIA = `Respuesta de la IA no válida: ${validado.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}`;
+      causaIA = 'esquema';
     } else {
       resultadoIA = { datos: validado.data, meta: bruto.meta };
     }
   } catch (err){
     if (err.name === 'AbortError') throw err;
-    errorIA = err.esCuota
-      ? `Cuota del proveedor agotada: ${err.message}`
-      : `Fallo al llamar a la IA: ${err.message}`;
+    if (err.esCuota){
+      errorIA = `Cuota del proveedor agotada: ${err.message}`;
+      causaIA = 'cuota';
+    } else if (err.agotoReintentos){
+      errorIA = `El modelo ${config.ia.gemini.modelo} está saturado y rechazó los 5 intentos. No es un problema del texto ni de la cuota. ${err.message}`;
+      causaIA = 'saturacion';
+    } else {
+      errorIA = `Fallo al llamar a la IA: ${err.message}`;
+      causaIA = 'otro';
+    }
   } finally {
     if (enVuelo.get(sesionId) === control) enVuelo.delete(sesionId);
   }
@@ -136,6 +158,8 @@ export async function analizarTexto({ sesionId, texto, tema, tipo = 'parcial' })
     metricas,
     ia: resultadoIA?.datos || null,
     error: errorIA,
+    causa: causaIA,
+    reintentable: causaIA === 'saturacion' || causaIA === 'otro',
     trazabilidad: {
       rubricaVersion: RUBRICA_VERSION,
       promptVersion: resultadoIA ? PROMPT_VERSION : null,
