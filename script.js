@@ -1,12 +1,14 @@
-
 // Referencias a los elementos del HTML
 const topicSelect      = document.getElementById('topicSelect');
 const customTopic      = document.getElementById('customTopic');
 const promptDisplay    = document.getElementById('promptDisplay');
 const phaseSelect      = document.getElementById('phaseSelect');
+const modeSelect       = document.getElementById('modeSelect');
 
 const studentName       = document.getElementById('studentName');
 const studentOccupation = document.getElementById('studentOccupation');
+const connStatus        = document.getElementById('connStatus');
+const participantCode   = document.getElementById('participantCode');
 
 const editor           = document.getElementById('editor');
 const wordCountEl      = document.getElementById('wordCount');
@@ -27,6 +29,7 @@ const confirmTime        = document.getElementById('confirmTime');
 const confirmWords       = document.getElementById('confirmWords');
 const confirmParagraphs  = document.getElementById('confirmParagraphs');
 const confirmGrade       = document.getElementById('confirmGrade');
+const rubricResults      = document.getElementById('rubricResults');
 const downloadBtn        = document.getElementById('downloadBtn');
 const retryBtn           = document.getElementById('retryBtn');
 const compareBtn         = document.getElementById('compareBtn');
@@ -39,15 +42,42 @@ const themeToggle       = document.getElementById('themeToggle');
 const TARGET_MIN = 220;
 const TARGET_MAX = 300;
 
-// Nombres usados para guardar datos en el navegador
+// Nombre usado para guardar el tema elegido en el navegador
 const THEME_KEY = 'prueba_redaccion_theme_v1';
-const SUBMISSIONS_KEY = 'prueba_redaccion_submissions_v1';
+
+// Ritmo de la comunicación con el backend
+const AUTOSAVE_MS       = 10000;  // guardar borrador cada 10 s
+const ANALISIS_ESPERA_MS = 20000; // analizar tras 20 s sin escribir
+const ANALISIS_DELTA     = 30;    // ...y solo si crecieron 30 palabras
 
 // Estado del cronómetro
 let seconds = 0;
 let timerInterval = null;
 let hasStarted = false;
 let isPaused = false;
+let isFinished = false;
+
+// Estado de la sesión en el servidor
+let sesionId = null;
+let codigoParticipante = null;
+let rubricaDef = null;
+let creandoSesion = null;      // promesa en curso, para no crear dos sesiones
+let textoUltimoGuardado = '';
+let palabrasUltimoAnalisis = 0;
+let temporizadorAnalisis = null;
+let analisisEnVuelo = null;
+
+// Evita que un tema escrito por el participante rompa el HTML al pintarlo.
+function esc(texto){
+  return String(texto ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function estadoConexion(texto, clase){
+  connStatus.textContent = texto;
+  connStatus.className = `pill pill--${clase}`;
+}
 
 // Convierte segundos a formato "02:35"
 function formatTime(totalSeconds){
@@ -58,7 +88,7 @@ function formatTime(totalSeconds){
 
 // Arranca el cronómetro
 function startTimer(){
-  if (hasStarted) return;
+  if (hasStarted || isFinished) return;
   hasStarted = true;
   pauseBtn.disabled = false;
   timerInterval = setInterval(() => {
@@ -69,7 +99,7 @@ function startTimer(){
 
 // Pausa o reanuda el cronómetro
 function togglePause(){
-  if (!hasStarted) return;
+  if (!hasStarted || isFinished) return;
   isPaused = !isPaused;
   if (isPaused){
     clearInterval(timerInterval);
@@ -83,67 +113,132 @@ function togglePause(){
   }
 }
 
-// Reinicia el cronómetro y vacía el editor
+// Detiene el cronómetro definitivamente (al entregar)
+function detenerCronometro(){
+  clearInterval(timerInterval);
+  isFinished = true;
+  pauseBtn.disabled = true;
+}
+
+// Reinicia cronómetro, editor y sesión
 function resetAll(){
   clearInterval(timerInterval);
   seconds = 0;
   hasStarted = false;
   isPaused = false;
+  isFinished = false;
   timerEl.textContent = '00:00';
   pauseBtn.textContent = 'Pausar';
   pauseBtn.disabled = true;
   editor.value = '';
+
+  sesionId = null;
+  creandoSesion = null;
+  textoUltimoGuardado = '';
+  palabrasUltimoAnalisis = 0;
+  clearTimeout(temporizadorAnalisis);
+  analisisEnVuelo?.abort();
+
+  rubricResults.hidden = true;
+  rubricResults.innerHTML = '';
   updateLiveCounters();
 }
 
-// Lee los intentos guardados (pre/post) del navegador
-function loadSubmissions(){
+// ---------------------------------------------------------------------------
+// Sesión en el servidor
+// ---------------------------------------------------------------------------
+
+function temaActual(){
+  if (topicSelect.value === '__custom__') return customTopic.value.trim();
+  return topicSelect.value || '';
+}
+
+// Crea la sesión la primera vez que hace falta. Si ya hay una en creación,
+// devuelve esa misma promesa para no abrir dos sesiones por carrera.
+function asegurarSesion(){
+  if (sesionId) return Promise.resolve(sesionId);
+  if (creandoSesion) return creandoSesion;
+
+  const nombre = studentName.value.trim();
+  if (nombre.length < 2) return Promise.resolve(null);
+
+  creandoSesion = API.crearSesion({
+    nombre,
+    ocupacion: studentOccupation.value.trim() || undefined,
+    fase: phaseSelect.value,
+    tema: temaActual() || undefined,
+    modo: modeSelect.value
+  }).then(datos => {
+    sesionId = datos.sesionId;
+    codigoParticipante = datos.codigo;
+    participantCode.textContent = `Código: ${datos.codigo}`;
+    participantCode.hidden = false;
+    estadoConexion(datos.reanudada ? 'Sesión reanudada' : 'Sesión iniciada', 'ok');
+    return sesionId;
+  }).catch(err => {
+    creandoSesion = null;
+    if (err.status === 409){
+      estadoConexion(err.message, 'error');
+    } else {
+      estadoConexion('Sin conexión con el servidor — tu texto no se está guardando', 'error');
+    }
+    return null;
+  });
+
+  return creandoSesion;
+}
+
+// Autoguardado periódico. Son los datos de proceso del estudio.
+async function autoguardar(){
+  if (!sesionId || isFinished) return;
+  const texto = editor.value;
+  if (texto === textoUltimoGuardado || !texto.trim()) return;
+
   try {
-    const raw = localStorage.getItem(SUBMISSIONS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch (err) {
-    return {};
+    await API.guardarBorrador(sesionId, { texto, segundos: seconds });
+    textoUltimoGuardado = texto;
+  } catch {
+    estadoConexion('Falló el autoguardado — revisa el servidor', 'error');
   }
 }
+setInterval(autoguardar, AUTOSAVE_MS);
 
-// Guarda un intento bajo su fase (pre o post)
-function saveSubmissionForPhase(phase, data){
-  const all = loadSubmissions();
-  all[phase] = data;
-  try { localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(all)); } catch (err) {}
+// Análisis en vivo. Se dispara tras una pausa al escribir y solo si el texto
+// creció lo suficiente: llamar a la IA en cada tecla sería caro e inútil.
+function programarAnalisis(){
+  clearTimeout(temporizadorAnalisis);
+  if (isFinished) return;
+
+  temporizadorAnalisis = setTimeout(async () => {
+    const id = await asegurarSesion();
+    if (!id) return;
+
+    const palabras = getWords(editor.value).length;
+    if (palabras < 30) return;
+    if (palabras - palabrasUltimoAnalisis < ANALISIS_DELTA) return;
+
+    analisisEnVuelo?.abort();
+    analisisEnVuelo = new AbortController();
+
+    try {
+      const resultado = await API.analizar(id, editor.value, analisisEnVuelo.signal);
+      palabrasUltimoAnalisis = palabras;
+
+      // En modo ciego el servidor registra pero no devuelve el juicio.
+      if (resultado.modo === 'ciego') return;
+      if (resultado.suficiente && resultado.puntajes){
+        pintarRubrica(resultado, { parcial: true });
+      }
+    } catch (err){
+      if (err.name !== 'AbortError') estadoConexion('Falló el análisis en vivo', 'error');
+    }
+  }, ANALISIS_ESPERA_MS);
 }
 
-// Muestra la tabla comparando el pre-test con el post-test
-function renderComparison(){
-  const all = loadSubmissions();
-  const pre = all.pre;
-  const post = all.post;
+// ---------------------------------------------------------------------------
+// Tema y contadores
+// ---------------------------------------------------------------------------
 
-  if (!pre || !post){
-    const faltante = !pre ? 'Pre-test' : 'Post-test';
-    comparisonBody.innerHTML = `<p>Todavía falta completar la fase "${faltante}" en este navegador para poder comparar.</p>`;
-  } else {
-    comparisonBody.innerHTML = `
-      <div class="compare-grid">
-        <div class="compare-row-header"></div>
-        <div class="compare-row-header">Pre-test</div>
-        <div class="compare-row-header">Post-test</div>
-
-        <div>Tema</div><div>${pre.topic}</div><div>${post.topic}</div>
-        <div>Tiempo</div><div>${pre.time}</div><div>${post.time}</div>
-        <div>Palabras</div><div>${pre.words}</div><div>${post.words}</div>
-        <div>Párrafos</div><div>${pre.paragraphs}</div><div>${post.paragraphs}</div>
-      </div>
-    `;
-  }
-
-  comparisonSection.hidden = false;
-  comparisonSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-compareBtn.addEventListener('click', renderComparison);
-
-// Actualiza el título del tema cuando cambia el selector
 topicSelect.addEventListener('change', () => {
   if (topicSelect.value === '__custom__'){
     customTopic.hidden = false;
@@ -159,23 +254,39 @@ topicSelect.addEventListener('change', () => {
   }
 });
 
-// Actualiza el título del tema cuando se escribe uno propio
 customTopic.addEventListener('input', () => {
   promptDisplay.textContent = customTopic.value || 'Escribe tu propio tema en el campo de arriba.';
 });
 
-// Cuenta las palabras del texto
+// Cambiar de fase abre una sesión distinta en el servidor. Si se arrastrara el
+// texto de la fase anterior se guardaría el mismo escrito en pre y en post, y
+// la comparación del estudio quedaría inservible.
+phaseSelect.addEventListener('change', () => {
+  if (editor.value.trim() && !confirm('Cambiar de fase borra el texto actual y empieza una sesión nueva. ¿Continuar?')){
+    phaseSelect.value = phaseSelect.value === 'pre' ? 'post' : 'pre';
+    return;
+  }
+  confirmation.hidden = true;
+  comparisonSection.hidden = true;
+  resetAll();
+  estadoConexion(`Fase: ${phaseSelect.value === 'pre' ? 'Pre-test' : 'Post-test'}`, 'wait');
+});
+
+modeSelect.addEventListener('change', () => {
+  if (sesionId) estadoConexion('El modo se aplica al iniciar la sesión; reinicia para cambiarlo', 'wait');
+});
+
+// Cuenta las palabras del texto. Incluye números: "2025" o "3%" son parte de
+// lo que el participante escribió y cuentan para la extensión.
 function getWords(text){
-  const matches = text.trim().match(/[a-záéíóúüñ]+/gi);
+  const matches = text.trim().match(/[\wáéíóúüñ]+/gi);
   return matches ? matches : [];
 }
 
-// Separa el texto en párrafos
 function getParagraphs(text){
   return text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
 }
 
-// Actualiza los contadores, la barra de progreso y si se puede entregar
 function updateLiveCounters(){
   const text = editor.value;
   const words = getWords(text);
@@ -198,54 +309,111 @@ function updateLiveCounters(){
     lengthHint.textContent = `Objetivo: 220–300 palabras · ${words.length - TARGET_MAX} de más`;
   }
 
-  submitBtn.disabled = words.length < 30 || !studentName.value.trim();
+  submitBtn.disabled = isFinished || words.length < 30 || !studentName.value.trim();
 }
 
 studentName.addEventListener('input', updateLiveCounters);
 
-// Arranca el cronómetro al escribir y recalcula los contadores
 editor.addEventListener('input', () => {
   if (!hasStarted && editor.value.trim().length > 0){
     startTimer();
+    asegurarSesion();
   }
   updateLiveCounters();
+  programarAnalisis();
 });
 
 pauseBtn.addEventListener('click', togglePause);
-resetBtn.addEventListener('click', resetAll);
+resetBtn.addEventListener('click', () => {
+  confirmation.hidden = true;
+  comparisonSection.hidden = true;
+  resetAll();
+});
 
-// Función pendiente de conectar con el backend del grupo 3.
-// Hoy solo imprime los datos en consola, no hace ninguna conexión real.
-async function sendToBackend(payload){
-  console.log('[pendiente de backend] esto es lo que se enviaría:', payload);
+// ---------------------------------------------------------------------------
+// Pintado de la rúbrica
+// ---------------------------------------------------------------------------
 
-  // const res = await fetch('https://<url-del-backend>/api/intentos', {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   body: JSON.stringify(payload)
-  // });
-  // const data = await res.json();
-  // return data.nota;
-
-  return null;
+function claseNivel(p){
+  if (p >= 4.5) return 'nivel--alto';
+  if (p >= 3.5) return 'nivel--medio-alto';
+  if (p >= 2.5) return 'nivel--medio';
+  if (p >= 1.5) return 'nivel--medio-bajo';
+  return 'nivel--bajo';
 }
 
-// Guarda los datos de la última entrega
+function pintarRubrica(resultado, { parcial = false } = {}){
+  if (!rubricaDef){ rubricResults.hidden = true; return; }
+
+  const { puntajes = {}, ia } = resultado;
+  const bloques = [];
+
+  if (parcial){
+    bloques.push('<p class="rubric__aviso">Análisis parcial mientras escribes. La calificación definitiva se calcula al entregar.</p>');
+  }
+
+  for (const dim of rubricaDef.dimensiones){
+    const puntuados = dim.parametros.map(p => puntajes[p.id]).filter(v => typeof v === 'number');
+    const promedio = puntuados.length
+      ? (puntuados.reduce((a, b) => a + b, 0) / puntuados.length)
+      : null;
+
+    bloques.push(`
+      <section class="rubric__dim">
+        <header class="rubric__dim-head">
+          <h4>${esc(dim.nombre)}</h4>
+          <span class="rubric__peso">${Math.round(dim.peso * 100)}%</span>
+          <span class="rubric__prom ${promedio ? claseNivel(promedio) : ''}">${promedio ? promedio.toFixed(1) : '—'} / 5</span>
+        </header>
+        <ul class="rubric__params">
+          ${dim.parametros.map(p => {
+            const valor = puntajes[p.id];
+            const detalle = ia?.parametros?.[p.id];
+            return `
+              <li class="rubric__param">
+                <div class="rubric__param-head">
+                  <span class="rubric__param-name">${esc(p.nombre)}</span>
+                  <span class="rubric__chip ${typeof valor === 'number' ? claseNivel(valor) : ''}">${valor ?? '—'}</span>
+                </div>
+                ${detalle?.justificacion ? `<p class="rubric__just">${esc(detalle.justificacion)}</p>` : ''}
+                ${detalle?.evidencia?.length
+                  ? `<ul class="rubric__evid">${detalle.evidencia.map(e => `<li>“${esc(e)}”</li>`).join('')}</ul>`
+                  : ''}
+              </li>`;
+          }).join('')}
+        </ul>
+      </section>`);
+  }
+
+  if (ia?.fortalezas?.length){
+    bloques.push(`<div class="rubric__notas"><h4>Fortalezas</h4><ul>${ia.fortalezas.map(f => `<li>${esc(f)}</li>`).join('')}</ul></div>`);
+  }
+  if (ia?.mejoras?.length){
+    bloques.push(`<div class="rubric__notas"><h4>Qué mejorar</h4><ul>${ia.mejoras.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`);
+  }
+
+  rubricResults.innerHTML = bloques.join('');
+  rubricResults.hidden = false;
+}
+
+// ---------------------------------------------------------------------------
+// Entrega
+// ---------------------------------------------------------------------------
+
 let lastSubmission = null;
 
-// Arma y muestra la entrega al hacer clic en "Entregar"
 submitBtn.addEventListener('click', async () => {
-  clearInterval(timerInterval);
-
+  const id = await asegurarSesion();
   const text = editor.value;
   const words = getWords(text);
   const paragraphs = getParagraphs(text);
 
+  detenerCronometro();
+  submitBtn.disabled = true;
+
   lastSubmission = {
-    student: {
-      name: studentName.value.trim(),
-      occupation: studentOccupation.value.trim()
-    },
+    student: { name: studentName.value.trim(), occupation: studentOccupation.value.trim() },
+    codigo: codigoParticipante,
     phase: phaseSelect.value,
     topic: promptDisplay.textContent,
     text,
@@ -261,27 +429,107 @@ submitBtn.addEventListener('click', async () => {
   confirmTime.textContent = lastSubmission.time;
   confirmWords.textContent = `${lastSubmission.words} palabras`;
   confirmParagraphs.textContent = `${lastSubmission.paragraphs} párrafos`;
-  confirmGrade.textContent = 'Pendiente — la calculará el backend cuando esté conectado';
-
-  saveSubmissionForPhase(phaseSelect.value, lastSubmission);
+  confirmGrade.textContent = 'Calculando…';
 
   confirmation.hidden = false;
   confirmation.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const nota = await sendToBackend(lastSubmission);
-  if (nota !== null && nota !== undefined){
-    confirmGrade.textContent = nota;
+  if (!id){
+    confirmGrade.textContent = 'Sin conexión con el servidor — descarga el .txt para no perder el texto';
+    return;
+  }
+
+  try {
+    const resultado = await API.entregar(id, { texto: text, segundos: seconds });
+    lastSubmission.nota = resultado.notaGlobal;
+
+    if (resultado.error){
+      confirmGrade.textContent = 'Pendiente de revisión manual — el análisis automático falló';
+      console.warn('[entrega]', resultado.error);
+    } else {
+      confirmGrade.textContent = `${resultado.notaGlobal} / 100`;
+    }
+    pintarRubrica(resultado);
+  } catch (err){
+    confirmGrade.textContent = `No se pudo calificar: ${err.message}`;
   }
 });
 
-// Vuelve a la pantalla de escritura, vacía
 retryBtn.addEventListener('click', () => {
   confirmation.hidden = true;
+  comparisonSection.hidden = true;
   resetAll();
   editor.focus();
 });
 
-// Descarga el texto entregado como archivo .txt
+// ---------------------------------------------------------------------------
+// Comparación pre/post — ahora la resuelve el servidor, no el localStorage.
+// Así funciona aunque las dos fases se hagan en computadores distintos.
+// ---------------------------------------------------------------------------
+
+compareBtn.addEventListener('click', async () => {
+  comparisonSection.hidden = false;
+  comparisonBody.innerHTML = '<p>Consultando…</p>';
+  comparisonSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const codigo = codigoParticipante;
+  if (!codigo){
+    comparisonBody.innerHTML = '<p>Todavía no hay una sesión iniciada en el servidor.</p>';
+    return;
+  }
+
+  try {
+    const datos = await API.comparar(codigo);
+    const fila = (etiqueta, valorPre, valorPost) =>
+      `<div>${esc(etiqueta)}</div><div>${esc(valorPre ?? '—')}</div><div>${esc(valorPost ?? '—')}</div>`;
+
+    if (!datos.pre || !datos.post){
+      const faltante = !datos.pre ? 'Pre-test' : 'Post-test';
+      comparisonBody.innerHTML = `<p>Falta completar la fase "${esc(faltante)}" de ${esc(codigo)} para poder comparar.</p>`;
+      return;
+    }
+
+    const deltaNota = datos.delta?.notaGlobal;
+    const signo = deltaNota > 0 ? '+' : '';
+
+    comparisonBody.innerHTML = `
+      ${datos.advertencia ? `<p class="rubric__aviso">${esc(datos.advertencia)}</p>` : ''}
+      <div class="compare-grid">
+        <div class="compare-row-header"></div>
+        <div class="compare-row-header">Pre-test</div>
+        <div class="compare-row-header">Post-test</div>
+        ${fila('Nota', datos.pre.notaGlobal, datos.post.notaGlobal)}
+        ${fila('Tema', datos.pre.tema, datos.post.tema)}
+        ${fila('Tiempo', formatTime(datos.pre.segundos || 0), formatTime(datos.post.segundos || 0))}
+        ${fila('Palabras', datos.pre.recuento?.palabras, datos.post.recuento?.palabras)}
+        ${fila('Párrafos', datos.pre.recuento?.parrafos, datos.post.recuento?.parrafos)}
+      </div>
+      ${deltaNota != null ? `<p class="compare-delta">Diferencia: <strong>${signo}${deltaNota} puntos</strong></p>` : ''}
+      ${renderDeltaParametros(datos.delta?.porParametro)}
+    `;
+  } catch (err){
+    comparisonBody.innerHTML = `<p>No se pudo consultar la comparación: ${esc(err.message)}</p>`;
+  }
+});
+
+function renderDeltaParametros(porParametro){
+  if (!porParametro || !rubricaDef) return '';
+  const nombres = {};
+  for (const d of rubricaDef.dimensiones){
+    for (const p of d.parametros) nombres[p.id] = p.nombre;
+  }
+  const items = Object.entries(porParametro).map(([id, delta]) => {
+    const signo = delta > 0 ? '+' : '';
+    const clase = delta > 0 ? 'delta--sube' : delta < 0 ? 'delta--baja' : 'delta--igual';
+    return `<li><span>${esc(nombres[id] || id)}</span><span class="${clase}">${signo}${delta}</span></li>`;
+  }).join('');
+  return `<div class="rubric__notas"><h4>Cambio por parámetro</h4><ul class="delta-list">${items}</ul></div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Descarga del texto
+// ---------------------------------------------------------------------------
+
 downloadBtn.addEventListener('click', () => {
   if (!lastSubmission) return;
 
@@ -290,6 +538,7 @@ downloadBtn.addEventListener('click', () => {
     '='.repeat(40),
     `Fecha: ${new Date().toLocaleString('es-CO')}`,
     `Participante: ${lastSubmission.student.name}`,
+    `Código: ${lastSubmission.codigo || '(sin sesión en el servidor)'}`,
     `Ocupación / estudios: ${lastSubmission.student.occupation || '(no especificado)'}`,
     `Fase: ${lastSubmission.phase === 'pre' ? 'Pre-test' : 'Post-test'}`,
     `Tema: ${lastSubmission.topic}`,
@@ -312,20 +561,21 @@ downloadBtn.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-// Cambia entre modo oscuro y modo claro
+// ---------------------------------------------------------------------------
+// Tema claro / oscuro
+// ---------------------------------------------------------------------------
+
 function applyTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
   themeToggle.textContent = theme === 'light' ? 'Modo oscuro' : 'Modo claro';
 }
 
-// Lee el tema guardado
 function loadTheme(){
-  try { return localStorage.getItem(THEME_KEY); } catch (err) { return null; }
+  try { return localStorage.getItem(THEME_KEY); } catch { return null; }
 }
 
-// Guarda el tema elegido
 function saveTheme(theme){
-  try { localStorage.setItem(THEME_KEY, theme); } catch (err) {}
+  try { localStorage.setItem(THEME_KEY, theme); } catch {}
 }
 
 themeToggle.addEventListener('click', () => {
@@ -335,9 +585,25 @@ themeToggle.addEventListener('click', () => {
   saveTheme(next);
 });
 
-// Se ejecuta al cargar la página
+// ---------------------------------------------------------------------------
+// Arranque
+// ---------------------------------------------------------------------------
+
 updateLiveCounters();
 
 const savedTheme = loadTheme();
 const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
 applyTheme(savedTheme || (prefersLight ? 'light' : 'dark'));
+
+(async () => {
+  try {
+    const salud = await API.salud();
+    rubricaDef = await API.rubrica();
+    estadoConexion(
+      `Servidor conectado · IA: ${salud.proveedorIA} · rúbrica ${salud.rubricaVersion}`,
+      salud.proveedorIA === 'simulado' ? 'wait' : 'ok'
+    );
+  } catch {
+    estadoConexion('Sin conexión con el servidor — arráncalo con "npm start" en backend/', 'error');
+  }
+})();

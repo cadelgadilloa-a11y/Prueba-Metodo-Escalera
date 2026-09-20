@@ -42,6 +42,10 @@
       </div>
     </div>
     <p class="student-info__hint">El nombre es obligatorio para poder entregar.</p>
+    <p class="student-info__status">
+      <span id="connStatus" class="pill pill--wait">Conectando con el servidor…</span>
+      <span id="participantCode" class="pill pill--code" hidden></span>
+    </p>
   </section>
 
   <!-- Hoja de escritura + barra lateral -->
@@ -56,6 +60,13 @@
           <select id="phaseSelect" class="page__topic-select page__topic-select--phase">
             <option value="pre">Pre-test</option>
             <option value="post">Post-test</option>
+          </select>
+
+          <label class="page__topic-label" for="modeSelect">Modo</label>
+          <select id="modeSelect" class="page__topic-select page__topic-select--phase">
+            <option value="ciego">Ciego (no muestra análisis)</option>
+            <option value="visible">Visible (muestra análisis en vivo)</option>
+            <option value="practica">Práctica (no cuenta)</option>
           </select>
 
           <label class="page__topic-label" for="topicSelect">Tema del artículo</label>
@@ -73,8 +84,10 @@
         <!-- Muestra el tema elegido -->
         <h2 id="promptDisplay" class="page__prompt">Elige un tema arriba para comenzar.</h2>
 
-        <!-- Corrector ortográfico del navegador apagado a propósito -->
-        <textarea id="editor" class="page__editor" placeholder="Empieza a escribir tu artículo aquí. El cronómetro inicia con tu primera palabra…" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
+        <!-- Corrector ortográfico activo: la ortografía no está entre los parámetros
+             de la rúbrica, así que no hay razón para quitárselo al participante.
+             Debe estar activo por igual en pre-test y post-test. -->
+        <textarea id="editor" class="page__editor" placeholder="Empieza a escribir tu artículo aquí. El cronómetro inicia con tu primera palabra…" spellcheck="true" lang="es"></textarea>
 
         <!-- Contadores de palabras y párrafos -->
         <div class="page__footer">
@@ -126,8 +139,10 @@
     <p>Participante: <strong id="confirmStudent"></strong></p>
     <p>Tema: <strong id="confirmTopic"></strong></p>
     <p>Tiempo de redacción: <strong id="confirmTime"></strong> · <span id="confirmWords"></span> · <span id="confirmParagraphs"></span></p>
-    <!-- Placeholder de la nota, hasta que exista backend -->
-    <p>Nota: <strong id="confirmGrade">Pendiente — la calculará el backend cuando esté conectado</strong></p>
+    <p>Nota: <strong id="confirmGrade">Calculando…</strong></p>
+
+    <!-- Desglose por dimensión y parámetro de la rúbrica -->
+    <div id="rubricResults" class="rubric" hidden></div>
     <div class="confirmation__actions">
       <button id="downloadBtn" class="btn btn--primary">Descargar texto (.txt)</button>
       <button id="retryBtn" class="btn btn--ghost">Escribir otra vez</button>
@@ -147,6 +162,7 @@
   <p>Página de captura de textos para la prueba de redacción. No calcula puntajes ni evaluaciones.</p>
 </footer>
 
+<script src="api.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

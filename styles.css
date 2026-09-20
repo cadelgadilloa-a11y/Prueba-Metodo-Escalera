@@ -116,7 +116,7 @@ button{ font-family: inherit; }
   font-size: clamp(1.8rem, 4.5vw, 2.9rem);
   line-height: 1.1;
   margin: 0 0 0.85rem;
-  max-width: 16ch;
+  max-width: 30ch;
 }
 .masthead__subtitle{
   font-size: 1.02rem;
@@ -461,4 +461,133 @@ button{ font-family: inherit; }
   .layout{ padding: 1.6rem 1.1rem 3rem; }
   .page{ padding: 1.4rem 1.2rem 0.9rem; }
   .confirmation__actions .btn{ width: 100%; min-width: 0; }
+}
+/* ===========================================================================
+   Estado de conexión y código de participante
+   =========================================================================== */
+.student-info__status{ margin: 6px 0 0; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.pill{
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.pill--ok{ color: var(--green); border-color: var(--green); }
+.pill--error{ color: var(--red); border-color: var(--red); }
+.pill--wait{ color: var(--muted); }
+.pill--code{ color: var(--gold); border-color: var(--gold); }
+
+/* ===========================================================================
+   Panel de resultados de la rúbrica
+   =========================================================================== */
+.rubric{ margin-top: 18px; display: grid; gap: 14px; }
+
+.rubric__aviso{
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--gold);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rubric__dim{
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.rubric__dim-head{
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.rubric__dim-head h4{
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+}
+.rubric__peso{ font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.rubric__prom{ font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+
+.rubric__params{ list-style: none; margin: 0; padding: 0; }
+.rubric__param{ padding: 9px 12px; border-top: 1px solid var(--line); }
+.rubric__param:first-child{ border-top: 0; }
+
+.rubric__param-head{ display: flex; align-items: center; gap: 10px; }
+.rubric__param-name{ flex: 1; font-size: 13px; }
+
+.rubric__chip{
+  font-family: var(--font-mono);
+  font-size: 12px;
+  min-width: 26px;
+  text-align: center;
+  padding: 2px 7px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+
+.nivel--alto{ color: var(--green); border-color: var(--green); }
+.nivel--medio-alto{ color: var(--green); }
+.nivel--medio{ color: var(--gold); }
+.nivel--medio-bajo{ color: var(--gold); border-color: var(--gold); }
+.nivel--bajo{ color: var(--red); border-color: var(--red); }
+
+.rubric__just{
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.rubric__evid{
+  margin: 6px 0 0;
+  padding-left: 14px;
+  font-size: 12px;
+  color: var(--page-text-soft);
+  font-style: italic;
+}
+
+.rubric__notas{
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 12px;
+}
+.rubric__notas h4{
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 14px;
+}
+.rubric__notas ul{ margin: 0; padding-left: 16px; font-size: 13px; line-height: 1.55; }
+
+/* Cambio por parámetro en la comparación pre/post */
+.delta-list{ list-style: none; padding: 0; }
+.delta-list li{
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  border-bottom: 1px dotted var(--line);
+}
+.delta-list li:last-child{ border-bottom: 0; }
+.delta--sube{ color: var(--green); font-family: var(--font-mono); }
+.delta--baja{ color: var(--red); font-family: var(--font-mono); }
+.delta--igual{ color: var(--muted); font-family: var(--font-mono); }
+
+.compare-delta{
+  margin-top: 10px;
+  font-size: 14px;
 }

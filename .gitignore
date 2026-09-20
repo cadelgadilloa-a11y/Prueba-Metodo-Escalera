@@ -1,0 +1,26 @@
+# Dependencias
+node_modules/
+
+# Secretos: nunca subir la API key
+.env
+.env.local
+
+# Base de datos del estudio: contiene datos de participantes
+datos/
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Exportaciones
+*.csv
+
+# Sistema operativo / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+
+# Documento fuente de la rúbrica: material del curso, no se publica
+FpI III.pdf
+*.pdf
