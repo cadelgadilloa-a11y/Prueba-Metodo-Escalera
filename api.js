@@ -41,6 +41,10 @@ const API = {
     return this._pedir('POST', '/api/sesiones', { nombre, ocupacion, fase, tema, modo });
   },
 
+  sesion(sesionId){
+    return this._pedir('GET', `/api/sesiones/${sesionId}`);
+  },
+
   guardarBorrador(sesionId, { texto, segundos }){
     return this._pedir('PATCH', `/api/sesiones/${sesionId}/borrador`, { texto, segundos });
   },

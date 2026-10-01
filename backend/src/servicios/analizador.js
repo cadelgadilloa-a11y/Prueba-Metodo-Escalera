@@ -76,10 +76,28 @@ export async function analizarTexto({ sesionId, texto, tema, tipo = 'parcial' })
     };
   }
 
-  // Cancela el análisis anterior de esta misma sesión, si sigue corriendo.
-  enVuelo.get(sesionId)?.abort();
+  // Cancela el análisis anterior de esta misma sesión, si sigue corriendo:
+  // el texto ya cambió y su resultado llegaría obsoleto.
+  //
+  // PERO un análisis parcial nunca puede cancelar una calificación final. Pasó
+  // en producción: un análisis en vivo que se disparaba justo al pulsar
+  // Entregar abortaba la calificación real, la ruta respondía 500 y la sesión
+  // quedaba marcada como entregada sin ninguna nota, imposible de reintentar
+  // porque el 409 ya bloqueaba abrirla de nuevo.
+  const anterior = enVuelo.get(sesionId);
+  if (anterior){
+    if (anterior.tipo === 'final' && tipo === 'parcial'){
+      return {
+        suficiente: false,
+        metricas,
+        mensaje: 'Hay una calificación final en curso para esta sesión; el análisis en vivo se omite.'
+      };
+    }
+    anterior.control.abort();
+  }
+
   const control = new AbortController();
-  enVuelo.set(sesionId, control);
+  enVuelo.set(sesionId, { control, tipo });
 
   const proveedor = obtenerProveedor();
   const prompt = construirPrompt({ texto, tema, metricas });
@@ -113,7 +131,7 @@ export async function analizarTexto({ sesionId, texto, tema, tipo = 'parcial' })
       causaIA = 'otro';
     }
   } finally {
-    if (enVuelo.get(sesionId) === control) enVuelo.delete(sesionId);
+    if (enVuelo.get(sesionId)?.control === control) enVuelo.delete(sesionId);
   }
 
   const puntajes = { ...puntajesDeterministas };

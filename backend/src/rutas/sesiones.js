@@ -111,12 +111,31 @@ rutasSesiones.post('/:id/entregar', async (req, res, next) => {
        WHERE id = ?
     `).run(Number(segundos) || 0, texto, sesion.id);
 
-    const resultado = await analizarTexto({
-      sesionId: sesion.id,
-      texto,
-      tema: sesion.tema,
-      tipo: 'final'
-    });
+    // Si el analisis falla de forma inesperada, la sesion NO puede quedar
+    // marcada como entregada y sin ningun registro: el 409 impediria abrirla
+    // otra vez y el participante se quedaria sin nota de forma permanente.
+    // El texto ya esta guardado en texto_final, asi que se deja la sesion en
+    // revision_manual y el front ofrece reintentar.
+    let resultado;
+    try {
+      resultado = await analizarTexto({
+        sesionId: sesion.id,
+        texto,
+        tema: sesion.tema,
+        tipo: 'final'
+      });
+    } catch (err){
+      console.error('[entregar] el analisis lanzo una excepcion:', err.message);
+      db.prepare("UPDATE sesiones SET estado = 'revision_manual' WHERE id = ?").run(sesion.id);
+      return res.json({
+        suficiente: true,
+        notaGlobal: null,
+        puntajes: {},
+        error: `El analisis se interrumpio: ${err.message}`,
+        causa: 'otro',
+        reintentable: true
+      });
+    }
 
     res.json(resultado);
   } catch (err){
@@ -170,5 +189,27 @@ rutasSesiones.get('/:id', (req, res) => {
     'SELECT id, tipo, creado_en, palabras, nota_global, error FROM analisis WHERE sesion_id = ? ORDER BY id'
   ).all(sesion.id);
 
-  res.json({ ...sesion, analisis });
+  // Última calificación final completa, ya calculada y guardada. Se devuelve
+  // entera para que el front pueda pintar la rúbrica sin volver a llamar a la
+  // IA: la nota ya existe, pedirla de nuevo seria gastar cuota por nada.
+  const fila = db.prepare(
+    "SELECT * FROM analisis WHERE sesion_id = ? AND tipo = 'final' ORDER BY id DESC LIMIT 1"
+  ).get(sesion.id);
+
+  const ultimaFinal = fila ? {
+    suficiente: true,
+    analisisId: fila.id,
+    notaGlobal: fila.nota_global,
+    puntajes: JSON.parse(fila.puntajes_json),
+    ia: fila.ia_json ? JSON.parse(fila.ia_json) : null,
+    error: fila.error,
+    trazabilidad: {
+      rubricaVersion: fila.rubrica_version,
+      promptVersion: fila.prompt_version,
+      proveedor: fila.ia_proveedor,
+      modelo: fila.ia_modelo
+    }
+  } : null;
+
+  res.json({ ...sesion, analisis, ultimaFinal });
 });

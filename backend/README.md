@@ -59,6 +59,33 @@ Son decisiones metodológicas, no técnicas. Cambiarlas invalida el estudio.
    `RUBRICA_VERSION` y los datos de antes dejan de ser comparables con los de
    después. El endpoint de comparación avisa cuando detecta versiones distintas.
 
+## Cuando el proveedor de IA falla
+
+El free tier de Gemini devuelve `503 UNAVAILABLE` ("high demand") de forma
+intermitente, y esos fallos vienen **en rachas**: medido el 2026-10-01, una
+misma petición tenía ~2/3 de éxito, pero cuando fallaba, fallaban también los
+5 reintentos del analizador porque ocurren todos dentro de ~44 segundos, o sea
+dentro de la misma racha.
+
+Por eso hay dos niveles de reintento:
+
+1. **Inmediato** — 5 intentos con esperas de 2, 5, 12 y 25 s, dentro de la misma
+   petición. Resuelve los fallos aislados.
+2. **Cola en segundo plano** (`servicios/cola.js`) — cada 90 s busca sesiones en
+   `revision_manual` con texto guardado y vuelve a intentarlo, hasta 12 veces
+   (~18 min). Esto es lo que cruza el borde de una racha.
+
+El participante entrega, su texto queda guardado al instante, y la pantalla se
+actualiza sola cuando la nota sale. `GET /api/salud` reporta el estado de la cola.
+
+Cómo distinguir las causas, que se registran en la columna `error` de `analisis`:
+
+| Código | Significa | Qué hacer |
+|---|---|---|
+| `503 UNAVAILABLE` | Modelo saturado | Nada: la cola reintenta sola |
+| `429 RESOURCE_EXHAUSTED` | Cuota agotada | Esperar al reinicio diario de cuota |
+| `404 NOT_FOUND` | Modelo descontinuado | Cambiar `GEMINI_MODELO` |
+
 ## Modos de sesión
 
 El modo decide si el participante ve el análisis mientras escribe.
@@ -124,8 +151,12 @@ Están marcados en el código con `SUPUESTO` y `DERIVADO`.
       cuartilla de 220-300 palabras. Dos parámetros se reinterpretaron a nivel de
       párrafo (`adaptadoACuartilla: true`). Decidir si la consigna al participante
       debe pedir explícitamente registro académico.
-- [ ] **Ortografía.** No aparece entre los parámetros del PDF, y el front
-      desactiva el corrector a propósito. Confirmar si se evalúa o no.
+- [x] **Ortografía.** Decidido: no se evalúa, y el corrector del navegador queda
+      activo. Debe estar activo por igual en pre-test y post-test.
+- [ ] **Fijar el modelo antes del primer participante real.** Ya hubo dos cambios
+      forzados (`gemini-2.0-flash` descontinuado, `gemini-3.6-flash` saturado).
+      Notas producidas por modelos distintos no son estrictamente comparables; la
+      columna `ia_modelo` de `analisis` permite auditarlo.
 
 ## Estructura
 

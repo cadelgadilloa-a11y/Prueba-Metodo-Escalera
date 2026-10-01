@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { rutasSesiones } from './rutas/sesiones.js';
 import { rutasDatos } from './rutas/datos.js';
 import { RUBRICA_VERSION, PESOS_CONFIRMADOS } from './evaluacion/rubrica.js';
+import { iniciarCola, estadoCola } from './servicios/cola.js';
 
 const app = express();
 
@@ -25,7 +26,9 @@ app.get('/api/salud', (_req, res) => {
     ok: true,
     proveedorIA: config.ia.proveedor,
     rubricaVersion: RUBRICA_VERSION,
-    pesosConfirmados: PESOS_CONFIRMADOS
+    pesosConfirmados: PESOS_CONFIRMADOS,
+    modelo: config.ia.proveedor === 'gemini' ? config.ia.gemini.modelo : null,
+    cola: estadoCola()
   });
 });
 
@@ -38,6 +41,7 @@ app.use((err, _req, res, _next) => {
 });
 
 app.listen(config.puerto, () => {
+  iniciarCola();
   console.log(`\n  Backend de la prueba de redacción`);
   console.log(`  http://localhost:${config.puerto}`);
   console.log(`  Proveedor de IA : ${config.ia.proveedor}`);

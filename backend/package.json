@@ -8,7 +8,8 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/server.js",
     "dev": "node --disable-warning=ExperimentalWarning --watch src/server.js",
-    "humo": "node --disable-warning=ExperimentalWarning pruebas/humo.mjs"
+    "humo": "node --disable-warning=ExperimentalWarning pruebas/humo.mjs",
+    "reiniciar-base": "node --disable-warning=ExperimentalWarning pruebas/reiniciar-base.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

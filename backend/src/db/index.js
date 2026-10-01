@@ -20,6 +20,20 @@ fs.mkdirSync(path.dirname(config.dbRuta), { recursive: true });
 export const db = new DatabaseSync(config.dbRuta);
 db.exec(fs.readFileSync(path.join(aqui, 'schema.sql'), 'utf8'));
 
+// Migraciones. schema.sql usa CREATE TABLE IF NOT EXISTS, que no agrega
+// columnas nuevas a una base que ya existe. Esto las añade sin perder datos:
+// la base del estudio no se puede recrear desde cero a mitad de camino.
+function agregarColumnaSiFalta(tabla, columna, definicion){
+  const existentes = db.prepare(`PRAGMA table_info(${tabla})`).all().map(c => c.name);
+  if (!existentes.includes(columna)){
+    db.exec(`ALTER TABLE ${tabla} ADD COLUMN ${columna} ${definicion}`);
+    console.log(`[db] columna agregada: ${tabla}.${columna}`);
+  }
+}
+
+agregarColumnaSiFalta('sesiones', 'intentos_calificacion', 'INTEGER NOT NULL DEFAULT 0');
+agregarColumnaSiFalta('sesiones', 'ultimo_intento_en', 'TEXT');
+
 // node:sqlite puede devolver lastInsertRowid como BigInt.
 export function idInsertado(info){
   return Number(info.lastInsertRowid);

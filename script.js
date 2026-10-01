@@ -67,6 +67,7 @@ let textoUltimoGuardado = '';
 let palabrasUltimoAnalisis = 0;
 let temporizadorAnalisis = null;
 let analisisEnVuelo = null;
+let falloSesion = null;        // por que no se pudo abrir sesion en el servidor
 
 // Evita que un tema escrito por el participante rompa el HTML al pintarlo.
 function esc(texto){
@@ -139,6 +140,8 @@ function resetAll(){
   palabrasUltimoAnalisis = 0;
   clearTimeout(temporizadorAnalisis);
   analisisEnVuelo?.abort();
+  falloSesion = null;
+  clearInterval(sondeoNota);
 
   rubricResults.hidden = true;
   rubricResults.innerHTML = '';
@@ -171,6 +174,7 @@ function asegurarSesion(){
     tema: temaActual() || undefined,
     modo: modeSelect.value
   }).then(datos => {
+    falloSesion = null;
     sesionId = datos.sesionId;
     codigoParticipante = datos.codigo;
     participantCode.textContent = `Código: ${datos.codigo}`;
@@ -180,14 +184,37 @@ function asegurarSesion(){
   }).catch(err => {
     creandoSesion = null;
     if (err.status === 409){
+      // El participante ya entregó esta fase. No es un fallo de red: el
+      // servidor esta protegiendo los datos del estudio para que no se
+      // sobrescriba una entrega anterior.
+      falloSesion = {
+        tipo: 'ya_entregada',
+        mensaje: err.message,
+        sesionId: err.datos?.sesionId ?? null
+      };
       estadoConexion(err.message, 'error');
     } else {
+      falloSesion = { tipo: 'sin_conexion', mensaje: err.message };
       estadoConexion('Sin conexión con el servidor — tu texto no se está guardando', 'error');
     }
     return null;
   });
 
   return creandoSesion;
+}
+
+// Muestra la nota de una entrega anterior, para que un 409 no sea un callejón
+// sin salida: el texto ya calificado existe, solo hay que ir a buscarlo.
+async function mostrarEntregaAnterior(idSesion){
+  try {
+    const sesion = await API.sesion(idSesion);
+    const final = sesion.ultimaFinal;
+    if (final?.notaGlobal != null) return `Su nota en esa entrega fue ${final.notaGlobal} / 100.`;
+    if (final?.error) return 'Esa entrega quedó pendiente de calificación.';
+    return 'Esa entrega no tiene calificación registrada.';
+  } catch {
+    return '';
+  }
 }
 
 // Autoguardado periódico. Son los datos de proceso del estudio.
@@ -403,7 +430,9 @@ function pintarRubrica(resultado, { parcial = false } = {}){
 function mensajeDeFallo(resultado){
   switch (resultado.causa){
     case 'saturacion':
-      return 'El servicio de IA esta saturado en este momento. No es un problema de tu texto. Pulsa "Reintentar calificacion" en un minuto.';
+      return 'El servicio de IA esta saturado ahora mismo. Tu texto YA quedo guardado. '
+           + 'El servidor seguira reintentando en segundo plano cada minuto y medio; '
+           + 'esta pantalla se actualizara sola cuando salga la nota.';
     case 'cuota':
       return 'Se agoto la cuota diaria del servicio de IA. La calificacion tendra que hacerse mas tarde o a mano.';
     case 'esquema':
@@ -413,13 +442,36 @@ function mensajeDeFallo(resultado){
   }
 }
 
+let sondeoNota = null;
+
+// Mientras la cola del servidor insiste, se consulta la sesion cada 20 s para
+// recoger la nota en cuanto exista, sin que el participante tenga que hacer nada.
+function iniciarSondeoDeNota(){
+  clearInterval(sondeoNota);
+  if (!sesionId) return;
+
+  sondeoNota = setInterval(async () => {
+    try {
+      const sesion = await API.sesion(sesionId);
+      // ultimaFinal viene con la calificacion ya guardada: no hay que
+      // volver a llamar a la IA para pintarla.
+      if (sesion.ultimaFinal?.notaGlobal != null){
+        clearInterval(sondeoNota);
+        mostrarResultadoFinal(sesion.ultimaFinal);
+      }
+    } catch { /* el servidor puede estar reiniciando; se reintenta en el proximo ciclo */ }
+  }, 20000);
+}
+
 // Pinta el resultado de una calificacion final, exitosa o fallida.
 function mostrarResultadoFinal(resultado){
   if (resultado.error){
     confirmGrade.textContent = mensajeDeFallo(resultado);
     retryGradeBtn.hidden = !resultado.reintentable;
+    if (resultado.reintentable) iniciarSondeoDeNota();
     console.warn('[calificacion]', resultado.error);
   } else {
+    clearInterval(sondeoNota);
     confirmGrade.textContent = `${resultado.notaGlobal} / 100`;
     retryGradeBtn.hidden = true;
   }
@@ -433,6 +485,13 @@ function mostrarResultadoFinal(resultado){
 let lastSubmission = null;
 
 submitBtn.addEventListener('click', async () => {
+  // Corta el analisis en vivo ANTES de hacer nada mas. Si un parcial sigue
+  // pendiente o en vuelo, puede pisarse con la calificacion final.
+  clearTimeout(temporizadorAnalisis);
+  analisisEnVuelo?.abort();
+  analisisEnVuelo = null;
+  isFinished = true;
+
   const id = await asegurarSesion();
   const text = editor.value;
   const words = getWords(text);
@@ -465,7 +524,19 @@ submitBtn.addEventListener('click', async () => {
   confirmation.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   if (!id){
-    confirmGrade.textContent = 'Sin conexión con el servidor — descarga el .txt para no perder el texto';
+    if (falloSesion?.tipo === 'ya_entregada'){
+      const anterior = falloSesion.sesionId
+        ? await mostrarEntregaAnterior(falloSesion.sesionId)
+        : '';
+      confirmGrade.textContent =
+        `${falloSesion.mensaje} ${anterior} ` +
+        'No se sobrescribe una entrega anterior. Si quieres volver a medirte, cambia de fase o usa otro nombre; ' +
+        'descarga el .txt si necesitas guardar este texto.';
+    } else {
+      confirmGrade.textContent =
+        'No se pudo abrir sesión en el servidor. Revisa que el backend esté corriendo. ' +
+        'Descarga el .txt para no perder el texto.';
+    }
     return;
   }
 
