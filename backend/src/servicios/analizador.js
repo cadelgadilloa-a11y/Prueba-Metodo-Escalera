@@ -46,7 +46,10 @@ async function llamarConReintentos(proveedor, argumentos){
         throw err;
       }
       ultimoError = err;
-      const espera = ESPERAS_MS[intento - 1];
+      // Si el proveedor dice cuanto esperar (RetryInfo), se le hace caso.
+      const espera = err.esperaSugeridaMs
+        ? Math.min(err.esperaSugeridaMs + 1000, 45000)
+        : ESPERAS_MS[intento - 1];
       console.warn(`[ia] intento ${intento}/${intentos} falló (${err.status}); reintentando en ${espera / 1000} s`);
       await esperar(espera);
     }
@@ -120,8 +123,13 @@ export async function analizarTexto({ sesionId, texto, tema, tipo = 'parcial' })
     }
   } catch (err){
     if (err.name === 'AbortError') throw err;
-    if (err.esCuota){
-      errorIA = `Cuota del proveedor agotada: ${err.message}`;
+    if (err.cuotaPorDia){
+      errorIA = `Cuota DIARIA del free tier agotada` +
+        (err.limiteDiario ? ` (limite: ${err.limiteDiario} peticiones/dia para ${config.ia.gemini.modelo})` : '') +
+        `. No se recupera hoy; reintentar no sirve. ${err.message}`;
+      causaIA = 'cuota_diaria';
+    } else if (err.esCuota){
+      errorIA = `Limite de peticiones por minuto alcanzado: ${err.message}`;
       causaIA = 'cuota';
     } else if (err.agotoReintentos){
       errorIA = `El modelo ${config.ia.gemini.modelo} está saturado y rechazó los 5 intentos. No es un problema del texto ni de la cuota. ${err.message}`;
@@ -177,7 +185,7 @@ export async function analizarTexto({ sesionId, texto, tema, tipo = 'parcial' })
     ia: resultadoIA?.datos || null,
     error: errorIA,
     causa: causaIA,
-    reintentable: causaIA === 'saturacion' || causaIA === 'otro',
+    reintentable: causaIA === 'saturacion' || causaIA === 'otro' || causaIA === 'cuota',
     trazabilidad: {
       rubricaVersion: RUBRICA_VERSION,
       promptVersion: resultadoIA ? PROMPT_VERSION : null,

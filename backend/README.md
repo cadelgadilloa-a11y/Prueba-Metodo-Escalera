@@ -82,9 +82,40 @@ Cómo distinguir las causas, que se registran en la columna `error` de `analisis
 
 | Código | Significa | Qué hacer |
 |---|---|---|
-| `503 UNAVAILABLE` | Modelo saturado | Nada: la cola reintenta sola |
-| `429 RESOURCE_EXHAUSTED` | Cuota agotada | Esperar al reinicio diario de cuota |
+| `503 UNAVAILABLE` | Modelo saturado, en rachas | Nada: la cola reintenta sola |
+| `429` con `quotaId` `...PerDay...` | **Cuota diaria agotada** | Esperar el reinicio de cuota. Reintentar no sirve y la cola se detiene sola |
+| `429` sin `PerDay` | Límite por minuto | Nada: se reintenta respetando el `retryDelay` del proveedor |
 | `404 NOT_FOUND` | Modelo descontinuado | Cambiar `GEMINI_MODELO` |
+
+### El límite del free tier es 20 peticiones al día POR MODELO
+
+Medido el 2026-10-01 contra la API:
+
+```
+quotaId:  GenerateRequestsPerDayPerProjectPerModel-FreeTier
+limit:    20
+model:    gemini-3.5-flash
+```
+
+Esto condiciona el plan del estudio, no solo el código. Cada calificación final
+es **una** petición, y cada análisis en vivo es **otra**. Con 20 al día:
+
+- Modo `ciego` o `practica` sin análisis en vivo: ~20 entregas al día.
+- Modo `visible`: muchas menos, porque cada pausa al escribir gasta una.
+
+Para un estudio de 40 participantes × 2 fases (80 calificaciones) hacen falta
+**4 días como mínimo** con un solo modelo, sin margen para reintentos. Opciones:
+
+1. **Repartir la aplicación en varios días**, en modo `ciego`, llevando la cuenta.
+2. **Activar facturación** en Google AI Studio. El volumen del estudio cuesta
+   centavos, y desaparece el límite de 20/día.
+3. **Otro proveedor** con free tier más amplio (p. ej. Groq). Implica escribir un
+   adaptador nuevo en `src/ia/`, que es la parte fácil: el resto del sistema no
+   cambia.
+
+Lo que **no** sirve es repartir participantes entre modelos distintos para sumar
+cuotas: notas producidas por modelos distintos no son comparables entre sí, y eso
+destruiría la comparación pre/post.
 
 ## Modos de sesión
 

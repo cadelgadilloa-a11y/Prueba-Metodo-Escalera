@@ -58,6 +58,15 @@ async function procesar(){
           db.prepare("UPDATE sesiones SET estado = 'entregada' WHERE id = ?").run(sesion.id);
           console.log(`[cola] sesión ${sesion.id} calificada: ${resultado.notaGlobal}/100 ` +
                       `(intento ${sesion.intentos_calificacion + 1})`);
+        } else if (resultado.causa === 'cuota_diaria'){
+          // La cuota diaria no se recupera hoy. Seguir intentando cada 90 s
+          // solo llenaria el log, asi que se detiene la ronda completa: todas
+          // las sesiones pendientes comparten la misma cuota.
+          console.warn(`[cola] cuota diaria agotada. Se detiene la ronda; ` +
+                       `las ${lista.length} sesiones pendientes esperan al reinicio de cuota.`);
+          // Se devuelve el intento consumido: no fue un intento real.
+          db.prepare('UPDATE sesiones SET intentos_calificacion = intentos_calificacion - 1 WHERE id = ?').run(sesion.id);
+          return;
         } else {
           console.warn(`[cola] sesión ${sesion.id} sigue fallando ` +
                        `(intento ${sesion.intentos_calificacion + 1}/${MAX_INTENTOS}): ${resultado.causa}`);

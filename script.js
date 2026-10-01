@@ -433,8 +433,12 @@ function mensajeDeFallo(resultado){
       return 'El servicio de IA esta saturado ahora mismo. Tu texto YA quedo guardado. '
            + 'El servidor seguira reintentando en segundo plano cada minuto y medio; '
            + 'esta pantalla se actualizara sola cuando salga la nota.';
+    case 'cuota_diaria':
+      return 'Se agoto la cuota DIARIA del servicio de IA (el plan gratuito permite 20 calificaciones al dia). '
+           + 'Tu texto quedo guardado. La nota se calculara cuando la cuota se renueve; '
+           + 'el servidor lo hara solo al reiniciarse la cuota.';
     case 'cuota':
-      return 'Se agoto la cuota diaria del servicio de IA. La calificacion tendra que hacerse mas tarde o a mano.';
+      return 'Se alcanzo el limite de peticiones por minuto. Tu texto quedo guardado y se reintentara en segundos.';
     case 'esquema':
       return 'La IA respondio en un formato inesperado. Queda para revision manual.';
     default:

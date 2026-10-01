@@ -65,14 +65,36 @@ export async function analizar({ prompt, señal }){
 
   if (!res.ok){
     const detalle = await res.text().catch(() => '');
-    const err = new Error(`Gemini respondió ${res.status}: ${detalle.slice(0, 300)}`);
+    const err = new Error(`Gemini respondió ${res.status}: ${detalle.slice(0, 400)}`);
     err.status = res.status;
-    // 429 = cuota agotada.
-    err.esCuota = res.status === 429;
+
     // Errores pasajeros: el modelo saturado (503) o un fallo interno del
-    // proveedor. Reintentar unos segundos después suele funcionar, y evita
-    // dejar sin nota a un participante por algo que no tiene que ver con él.
-    err.esTransitorio = [429, 500, 502, 503, 504].includes(res.status);
+    // proveedor. Reintentar unos segundos después suele funcionar.
+    err.esTransitorio = [500, 502, 503, 504].includes(res.status);
+
+    if (res.status === 429){
+      err.esCuota = true;
+      // Un 429 puede ser dos cosas muy distintas y hay que separarlas:
+      //  - límite por minuto: se recupera en segundos, vale reintentar.
+      //  - cuota POR DÍA: no se recupera hoy. Reintentar es inútil y solo
+      //    llena el log. El free tier de Gemini son 20 peticiones al día
+      //    por modelo (medido el 2026-10-01).
+      let cuerpo = null;
+      try { cuerpo = JSON.parse(detalle); } catch {}
+
+      const violaciones = cuerpo?.error?.details
+        ?.find(d => d['@type']?.endsWith('QuotaFailure'))?.violations ?? [];
+      const porDia = violaciones.some(v => /PerDay/i.test(v.quotaId || ''));
+
+      const retry = cuerpo?.error?.details
+        ?.find(d => d['@type']?.endsWith('RetryInfo'))?.retryDelay;
+      err.esperaSugeridaMs = retry ? Number(String(retry).replace('s', '')) * 1000 : null;
+
+      err.cuotaPorDia = porDia;
+      err.esTransitorio = !porDia;   // solo el límite por minuto se reintenta
+      err.limiteDiario = violaciones.find(v => /PerDay/i.test(v.quotaId || ''))?.quotaValue ?? null;
+    }
+
     throw err;
   }
 
