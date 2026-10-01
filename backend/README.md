@@ -117,6 +117,13 @@ Lo que **no** sirve es repartir participantes entre modelos distintos para sumar
 cuotas: notas producidas por modelos distintos no son comparables entre sí, y eso
 destruiría la comparación pre/post.
 
+**Cuota agotada mientras se prueba:** como el límite es por modelo, cambiar
+`GEMINI_MODELO` a un modelo distinto da 20 peticiones frescas de inmediato. Sirve
+para desarrollar y para demostraciones; NO sirve para repartir participantes del
+estudio real, por lo del párrafo anterior. Modelos verificados funcionando con la
+rúbrica: `gemini-3.5-flash-lite` (~5 s), `gemini-3.5-flash` (17-58 s),
+`gemini-3.6-flash` y `gemini-3.7-flash` (ambos con 503 frecuentes).
+
 ## Modos de sesión
 
 El modo decide si el participante ve el análisis mientras escribe.
