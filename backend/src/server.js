@@ -9,6 +9,11 @@ import { iniciarCola, estadoCola } from './servicios/cola.js';
 
 const app = express();
 
+// En la nube (Railway, Render) el backend está detrás de un proxy. Sin esto
+// todas las peticiones parecen venir de la misma IP y el límite de 60/min se
+// aplicaría a todos los participantes juntos, no a cada uno.
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: config.origenPermitido }));
 app.use(express.json({ limit: '1mb' }));
 

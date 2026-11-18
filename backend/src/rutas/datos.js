@@ -78,7 +78,14 @@ rutasDatos.get('/participantes/:codigo/comparar', (req, res) => {
 // deterministas se calcularon). Excluirla haría desaparecer participantes de
 // la muestra sin dejar rastro. La columna `estado` y la columna `error` dicen
 // cuáles necesitan calificación a mano.
-rutasDatos.get('/export.csv', (_req, res) => {
+rutasDatos.get('/export.csv', (req, res) => {
+  // Publicado en internet, la exportación con los datos del estudio necesita
+  // una clave: /api/export.csv?clave=EXPORT_CLAVE. Sin la variable definida
+  // (uso local) queda abierta como antes.
+  const clave = process.env.EXPORT_CLAVE;
+  if (clave && req.query.clave !== clave){
+    return res.status(401).json({ error: 'Clave de exportación inválida' });
+  }
   const filas = db.prepare(`
     SELECT p.codigo, p.ocupacion, s.fase, s.tema, s.modo, s.estado,
            s.segundos_redaccion, s.entregada_en,

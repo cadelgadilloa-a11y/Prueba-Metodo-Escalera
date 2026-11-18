@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Backend de la prueba de redaccion tipo cuartilla (Investigacion 3). Analiza y califica textos segun los criterios del documento FpI III.",
-  "engines": { "node": ">=22" },
+  "engines": { "node": "22.x" },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/server.js",
     "dev": "node --disable-warning=ExperimentalWarning --watch src/server.js",

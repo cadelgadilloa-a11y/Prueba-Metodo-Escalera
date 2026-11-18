@@ -24,3 +24,6 @@ desktop.ini
 # Documento fuente de la rúbrica: material del curso, no se publica
 FpI III.pdf
 *.pdf
+
+# Copia del frontend que se sube a Hostinger
+publicar/

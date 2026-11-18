@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Prueba cerrada</title>
+<style>
+  :root{ --bg:#14121C; --surface:#1C1926; --text:#EDEAF0; --muted:#93899F; --line:#332E42; --accent:#E3A7AE; }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#F5F3EE; --surface:#FFFFFF; --text:#23222A; --muted:#6b7280; --line:#DDD8C9; --accent:#9c7a1a; }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; display:grid; place-items:center; padding:16px;
+        background:var(--bg); color:var(--text); font:16px/1.6 system-ui, sans-serif; }
+  main{ max-width:480px; width:100%; background:var(--surface); border:1px solid var(--line);
+        border-radius:3px; padding:40px 32px; text-align:center; }
+  p.kicker{ margin:0 0 8px; font-size:.75rem; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+  h1{ margin:0 0 16px; font:600 1.75rem/1.2 Georgia, serif; }
+  p{ margin:0; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">Prueba de redacción</p>
+  <h1>La prueba ya cerró</h1>
+  <p>El periodo para presentar la prueba de redacción tipo cuartilla terminó. Gracias por tu interés.</p>
+</main>
+</body>
+</html>
