@@ -3,7 +3,11 @@
 // Si el backend corre en otro puerto o en otra máquina, este es el único
 // lugar que hay que tocar.
 
-const API_BASE = 'http://localhost:3000';
+// En tu equipo (abriendo index.html local) usa el backend local; publicado,
+// usa el de Railway.
+const API_BASE = ['localhost', '127.0.0.1', ''].includes(location.hostname)
+  ? 'http://localhost:3000'
+  : 'https://prueba-metodo-escalera-production.up.railway.app';
 
 const API = {
   base: API_BASE,
