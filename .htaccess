@@ -24,6 +24,13 @@ DirectoryIndex index.html
 </FilesMatch>
 
 <IfModule mod_headers.c>
+  # Que el navegador revalide siempre: así un cambio en los archivos se ve
+  # en la siguiente carga y no 7 días después (el valor por defecto de Hostinger).
+  <FilesMatch "\.(html|js|css)$">
+    Header always set Cache-Control "no-cache"
+    Header always unset Expires
+  </FilesMatch>
+
   Header always set Strict-Transport-Security "max-age=31536000"
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
